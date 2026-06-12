@@ -71,8 +71,10 @@ export const api = {
   spExport: (data)   => post("/api/sharepoint/export", data),
 
   // Microsoft 365 — Teams
-  teamsMeetings: ()      => get("/api/teams/meetings", { token: msToken() }),
-  teamsMOM:      (data)  => post("/api/teams/mom", data),
+  teamsMeetings:     ()         => get("/api/teams/meetings", { token: msToken() }),
+  teamsMOM:          (data)     => post("/api/teams/mom", data),
+  teamsChats:        ()         => get("/api/teams/chats",    { token: msToken() }),
+  teamsChatMessages: (chatId)   => get(`/api/teams/chats/${chatId}/messages`, { token: msToken() }),
 
   // Microsoft 365 — Outlook
   outlookEmails: ()      => get("/api/outlook/emails", { token: msToken() }),

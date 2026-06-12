@@ -14,11 +14,243 @@ let healthChart = null;
 let _tokenTimer      = null;   // proactive expiry warning timer
 let _tokenRefreshing = false;  // prevent concurrent refresh calls
 
+// ── Navigate to a panel by key ─────────────────────────────────
+function navTo(panelKey) {
+  const navEl = document.querySelector(`[data-panel="${panelKey}"]`);
+  if (navEl) window.nav(navEl);
+}
+
+// ── AI particle-network background for the login panel ─────────
+let _tmAnim = null;
+function startTmBackground() {
+  const canvas = document.getElementById("tm-bg-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    canvas.width  = canvas.offsetWidth  || window.innerWidth;
+    canvas.height = canvas.offsetHeight || window.innerHeight;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  const N = 55;
+  const pts = Array.from({ length: N }, () => ({
+    x:  Math.random() * canvas.width,
+    y:  Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 0.35,
+    vy: (Math.random() - 0.5) * 0.35,
+    r:  Math.random() * 2.2 + 1,
+  }));
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Lines between close particles
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const dx   = pts[i].x - pts[j].x;
+        const dy   = pts[i].y - pts[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 160) {
+          const alpha = (1 - dist / 160) * 0.22;
+          ctx.strokeStyle = `rgba(147,197,253,${alpha})`;
+          ctx.lineWidth   = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Glowing dots
+    pts.forEach(p => {
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+      g.addColorStop(0,   "rgba(191,219,254,0.95)");
+      g.addColorStop(0.4, "rgba(99,179,237,0.4)");
+      g.addColorStop(1,   "rgba(99,179,237,0)");
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      p.x += p.vx;  p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width)  p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+    });
+
+    _tmAnim = requestAnimationFrame(draw);
+  }
+
+  if (_tmAnim) cancelAnimationFrame(_tmAnim);
+  _tmAnim = requestAnimationFrame(draw);
+}
+
+function stopTmBackground() {
+  if (_tmAnim) { cancelAnimationFrame(_tmAnim); _tmAnim = null; }
+}
+
+// ── Teams Chat ─────────────────────────────────────────────────
+window.tcToggleTokenInput = function () {
+  const area = document.getElementById("tc-token-input-area");
+  if (area) area.style.display = area.style.display === "none" ? "block" : "none";
+};
+
+window.tcSaveToken = function () {
+  const val = document.getElementById("tc-token-input")?.value?.trim();
+  if (!val) { showToast("Paste your token first."); return; }
+  localStorage.setItem("spToken", val);
+  updateTokenUI();
+  const area = document.getElementById("tc-token-input-area");
+  if (area) area.style.display = "none";
+  showToast("Microsoft 365 connected.");
+  window.syncTeamsChats(document.getElementById("tc-sync-btn"));
+};
+
+window.syncTeamsChats = async function (btn) {
+  const token     = localStorage.getItem("spToken") || "";
+  const noTokEl   = document.getElementById("tc-no-token");
+  const chatUiEl  = document.getElementById("tc-chat-ui");
+
+  if (!token) {
+    if (noTokEl)  noTokEl.style.display  = "block";
+    if (chatUiEl) chatUiEl.style.display = "none";
+    showToast("Paste a Microsoft 365 token to sync Teams chats.");
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Syncing…'; }
+
+  const data = await api.teamsChats();
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync chats'; }
+
+  if (data.error) {
+    if (noTokEl)  noTokEl.style.display  = "block";
+    if (chatUiEl) chatUiEl.style.display = "none";
+    showToast("Teams chat error: " + data.error);
+    return;
+  }
+
+  if (noTokEl)  noTokEl.style.display  = "none";
+  if (chatUiEl) chatUiEl.style.display = "block";
+
+  const chats   = data.chats || [];
+  const syncLbl = document.getElementById("tc-sync-lbl");
+  if (syncLbl) syncLbl.textContent = "Last synced: " + new Date().toLocaleTimeString("en-IN");
+  const countEl = document.getElementById("tc-chat-count");
+  if (countEl) { countEl.textContent = chats.length; countEl.style.display = chats.length ? "inline" : "none"; }
+
+  _renderTcChatList(chats);
+  showToast(`Loaded ${chats.length} conversation(s) from Teams.`);
+};
+
+let _tcChats = [];
+function _renderTcChatList(chats) {
+  _tcChats = chats;
+  const listEl = document.getElementById("tc-chat-list");
+  if (!listEl) return;
+
+  if (!chats.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center">No conversations found.</div>';
+    return;
+  }
+
+  listEl.innerHTML = "";
+  chats.forEach((chat, i) => {
+    const memberNames = (chat.members || []).map(m => m.displayName).filter(Boolean);
+    const name   = chat.topic || memberNames.slice(0, 2).join(", ") || "Teams chat";
+    const preview = chat.lastMessagePreview?.body?.content?.replace(/<[^>]+>/g, "").trim() || "";
+    const time   = chat.lastUpdatedDateTime
+      ? new Date(chat.lastUpdatedDateTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+      : "";
+    const initials = name.split(" ").slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "T";
+
+    const row = document.createElement("div");
+    row.className = "meet-row";
+    row.style.gap = "10px";
+    row.innerHTML = `
+      <div style="width:36px;height:36px;background:#6264a7;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#fff">${escHtml(initials)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="mr-t">${escHtml(name)}</div>
+        <div class="mr-m" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(preview.slice(0, 55))}${preview.length > 55 ? "…" : ""}</div>
+      </div>
+      ${time ? `<span style="font-size:10px;color:var(--hint);flex-shrink:0">${escHtml(time)}</span>` : ""}`;
+    row.onclick = () => _loadTcMessages(chat.id, name, row);
+    listEl.appendChild(row);
+  });
+}
+
+async function _loadTcMessages(chatId, chatName, row) {
+  document.querySelectorAll("#tc-chat-list .meet-row").forEach(r => r.classList.remove("sel"));
+  if (row) row.classList.add("sel");
+
+  const panel = document.getElementById("tc-messages-panel");
+  if (!panel) return;
+
+  panel.style.display    = "block";
+  panel.style.alignItems = "initial";
+  panel.style.justifyContent = "initial";
+  panel.innerHTML = `
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <i class="ti ti-brand-teams" style="color:#6264a7;font-size:15px"></i> ${escHtml(chatName)}
+    </div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0">
+      <span class="ldot" style="background:#6264a7"></span> Loading messages…
+    </div>`;
+
+  const data = await api.teamsChatMessages(chatId);
+
+  if (data.error) {
+    panel.innerHTML = `<div style="font-size:12px;color:var(--red);padding:12px;background:var(--red-bg);border-radius:var(--r-sm)">${escHtml(data.error)}</div>`;
+    return;
+  }
+
+  const messages = (data.messages || []).filter(m => m.messageType !== "systemEventMessage").reverse();
+
+  panel.innerHTML = `
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <i class="ti ti-brand-teams" style="color:#6264a7;font-size:15px"></i> ${escHtml(chatName)}
+      <span class="badge" style="margin-left:auto;background:rgba(98,100,167,.12);color:#6264a7;border-color:rgba(98,100,167,.25)">${messages.length} messages</span>
+    </div>
+    <div id="tc-msg-list" style="display:flex;flex-direction:column;gap:12px;max-height:500px;overflow-y:auto;padding-right:4px">
+      ${!messages.length ? '<div style="font-size:12px;color:var(--hint);text-align:center;padding:16px">No messages in this conversation.</div>' : ""}
+    </div>`;
+
+  const listEl = panel.querySelector("#tc-msg-list");
+  messages.forEach(msg => {
+    const sender   = msg.from?.user?.displayName || msg.from?.application?.displayName || "Unknown";
+    const body     = msg.body?.content?.replace(/<[^>]+>/g, "").trim() || "(no content)";
+    const time     = msg.createdDateTime
+      ? new Date(msg.createdDateTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
+    const date     = msg.createdDateTime
+      ? new Date(msg.createdDateTime).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "";
+    const initials = sender.split(" ").slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+
+    const el = document.createElement("div");
+    el.style.cssText = "display:flex;gap:9px;align-items:flex-start";
+    el.innerHTML = `
+      <div style="width:30px;height:30px;background:#6264a7;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:#fff;margin-top:1px">${escHtml(initials)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:600;color:var(--text)">${escHtml(sender)}</span>
+          <span style="font-size:10px;color:var(--hint)">${escHtml(date)} ${escHtml(time)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.55;word-break:break-word">${escHtml(body.slice(0, 500))}${body.length > 500 ? "…" : ""}</div>
+      </div>`;
+    listEl.appendChild(el);
+  });
+
+  if (listEl) listEl.scrollTop = listEl.scrollHeight;
+}
+
 // ── Navigation ─────────────────────────────────────────────────
 const PAGE_TITLES = {
-  ov: "Dashboard",    cal: "Calendar & meetings",
-  tm: "Teams meetings", ol: "Outlook inbox",
-  wr: "Weekly report",  mm: "MOM generator",
+  tm: "Teams meetings",
+  ov: "Dashboard",        cal: "Calendar & meetings",
+  tc: "Teams Chat",       ol:  "Outlook inbox",
+  wr: "Weekly report",    mm:  "MOM generator",
   su: "Stand-up generator", dc: "Document repository",
   lv: "Leave & resources",  ai: "General assistant",
 };
@@ -31,13 +263,34 @@ window.nav = function (el) {
   el.classList.add("active");
   const titleEl = document.getElementById("page-title");
   if (titleEl) titleEl.textContent = PAGE_TITLES[id] || id;
+  // Hide sidebar+topbar on welcome panel; show for all other panels
+  const appEl = document.getElementById("app");
+  const isLogin = id === "tm" && !ewsGetCreds().ewsUrl;
+  if (appEl) appEl.classList.toggle("login-mode", isLogin);
+  if (isLogin) { startTmBackground(); } else { stopTmBackground(); }
   if (id === "cal") {
     renderCalendar(events);
     renderSchedule(todayKey(), events);
-    // Auto-pull Exchange calendar if connected and not yet loaded
     const creds = ewsGetCreds();
     if (creds.ewsUrl && !_ewsMeetings.length) {
       window.syncOutlookCalendar(document.getElementById("cal-sync-btn"));
+    }
+  }
+  if (id === "tc") {
+    const tok      = localStorage.getItem("spToken") || "";
+    const noTokEl  = document.getElementById("tc-no-token");
+    const chatUiEl = document.getElementById("tc-chat-ui");
+    if (tok) {
+      if (noTokEl)  noTokEl.style.display  = "none";
+      if (chatUiEl && chatUiEl.style.display === "none" && document.getElementById("tc-chat-list")?.children.length <= 1) {
+        // Auto-sync if not yet loaded
+        window.syncTeamsChats(document.getElementById("tc-sync-btn"));
+      } else if (chatUiEl) {
+        chatUiEl.style.display = "block";
+      }
+    } else {
+      if (noTokEl)  noTokEl.style.display  = "block";
+      if (chatUiEl) chatUiEl.style.display = "none";
     }
   }
 };
@@ -475,13 +728,22 @@ function ewsGetCreds() {
 }
 function ewsRestoreUI() {
   const { ewsUrl, username } = ewsGetCreds();
-  if (!ewsUrl || !username) return;
-  document.getElementById("ews-setup-form").style.display     = "none";
-  document.getElementById("ews-connected-state").style.display = "block";
-  document.getElementById("ews-status-badge").style.display   = "inline-flex";
-  document.getElementById("ews-notconn-badge").style.display  = "none";
-  const userLbl = document.getElementById("ews-user-label");
-  if (userLbl) userLbl.textContent = username + "  ·  " + ewsUrl.replace("https://","").replace("/EWS/Exchange.asmx","");
+  const setupEl     = document.getElementById("ews-setup-form");
+  const connectedEl = document.getElementById("ews-connected-state");
+  const userLbl     = document.getElementById("ews-user-label");
+
+  if (ewsUrl && username) {
+    if (setupEl)     setupEl.style.display     = "none";
+    if (connectedEl) connectedEl.style.display = "block";
+    if (userLbl) userLbl.textContent = username + "  ·  " + ewsUrl.replace("https://","").replace("/EWS/Exchange.asmx","");
+    const olHint = document.getElementById("ol-ews-hint");
+    const olOk   = document.getElementById("ol-ews-ok");
+    if (olHint) olHint.style.display = "none";
+    if (olOk)   olOk.style.display   = "inline";
+  } else {
+    if (setupEl)     setupEl.style.display     = "block";
+    if (connectedEl) connectedEl.style.display = "none";
+  }
 }
 
 function renderEWSMeetings(meetings) {
@@ -687,33 +949,48 @@ window.transferMOMToPanel = function () {
   document.querySelector(".email-modal-overlay, [style*='z-index:10000']")?.remove();
 };
 
-window.ewsConnect = async function (btn) {
-  const url      = document.getElementById("ews-url")?.value?.trim();
+window.ewsCheckInputs = function () {
   const username = document.getElementById("ews-username")?.value?.trim();
   const password = document.getElementById("ews-password")?.value?.trim();
+  const btn = document.getElementById("ews-connect-btn");
+  if (btn) btn.disabled = !(username && password);
+};
+
+window.ewsConnect = async function (btn) {
+  const username = document.getElementById("ews-username")?.value?.trim();
+  const password = document.getElementById("ews-password")?.value?.trim();
+  const urlEl    = document.getElementById("ews-url");
   const errEl    = document.getElementById("ews-error");
 
-  if (!url || !username || !password) {
-    if (errEl) { errEl.textContent = "Please fill in the server URL, username, and password."; errEl.style.display = "block"; }
+  if (!username || !password) {
+    if (errEl) { errEl.textContent = "Please enter your username and password."; errEl.style.display = "block"; }
     return;
   }
   if (errEl) errEl.style.display = "none";
 
-  btn.disabled = true;
-  btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Connecting...';
+  // Use the field value; if blank, auto-derive from email domain or fall back to ESDS default
+  let url = urlEl?.value?.trim();
+  if (!url) {
+    const domain = username.includes("@") ? username.split("@")[1] : "";
+    url = domain ? `https://owa.${domain}/EWS/Exchange.asmx` : "https://owa.esds.co.in/EWS/Exchange.asmx";
+    if (urlEl) urlEl.value = url;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Connecting…'; }
 
   const data = await api.ewsMeetings({ ewsUrl: url, username, password });
 
-  btn.disabled = false;
-  btn.innerHTML = '<i class="ti ti-plug"></i> Connect &amp; sync';
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-plug"></i> Connect &amp; Sync'; }
 
   if (data.error) {
     if (errEl) { errEl.textContent = data.error; errEl.style.display = "block"; }
     return;
   }
 
-  // Save credentials after successful connection
   ewsSaveCreds(url, username, password);
+  // Remove login-mode so sidebar + topbar reappear
+  document.getElementById("app")?.classList.remove("login-mode");
+  stopTmBackground();
   ewsRestoreUI();
 
   _ewsMeetings = data.meetings || [];
@@ -721,10 +998,10 @@ window.ewsConnect = async function (btn) {
   updateOverviewStats(_ewsMeetings, null);
   renderOvUpcoming(_ewsMeetings);
 
-  const syncLbl = document.getElementById("ews-last-sync-lbl");
-  if (syncLbl) syncLbl.textContent = "Last synced: " + new Date().toLocaleTimeString("en-IN");
+  showToast(`Connected! Loaded ${_ewsMeetings.length} meeting(s).`);
 
-  showToast(`Connected to Exchange. Loaded ${_ewsMeetings.length} meeting(s).`);
+  // Redirect to Dashboard after successful connection
+  navTo("ov");
 };
 
 window.ewsSync = async function (btn) {
@@ -755,29 +1032,53 @@ window.ewsDisconnect = function () {
   localStorage.removeItem("ewsUsername");
   localStorage.removeItem("ewsPassword");
   if (_ewsAutoSyncTimer) { clearInterval(_ewsAutoSyncTimer); _ewsAutoSyncTimer = null; }
-
-  document.getElementById("ews-setup-form").style.display     = "block";
-  document.getElementById("ews-connected-state").style.display = "none";
-  document.getElementById("ews-status-badge").style.display   = "none";
-  document.getElementById("ews-notconn-badge").style.display  = "inline";
-
   _ewsMeetings = [];
-  const list = document.getElementById("teams-list");
-  if (list) list.innerHTML = '<div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center"><i class="ti ti-calendar-search" style="display:block;font-size:24px;margin-bottom:8px;color:var(--border)"></i>Connect to Exchange above — meetings will load automatically.</div>';
   const countEl = document.getElementById("meetings-count");
   if (countEl) countEl.style.display = "none";
-  showToast("Disconnected from Exchange.");
+  document.getElementById("app")?.classList.add("login-mode");
+  ewsRestoreUI();
+  navTo("tm");
+  startTmBackground();
+  showToast("Signed out from Exchange.");
 };
 
-window.ewsToggleAutoSync = function (checkbox) {
-  if (checkbox.checked) {
+window.ewsToggleAutoSync = function (btn) {
+  const active = btn.dataset.active === "1";
+  if (!active) {
     _ewsAutoSyncTimer = setInterval(() => window.ewsSync(null), 5 * 60 * 1000);
-    showToast("Auto-sync enabled — will refresh every 5 minutes.");
+    btn.dataset.active = "1";
+    btn.innerHTML = '<i class="ti ti-refresh"></i> Auto-sync on';
+    showToast("Auto-sync enabled — refreshes every 5 minutes.");
   } else {
     if (_ewsAutoSyncTimer) { clearInterval(_ewsAutoSyncTimer); _ewsAutoSyncTimer = null; }
+    btn.dataset.active = "0";
+    btn.innerHTML = '<i class="ti ti-refresh"></i> Auto-sync off';
     showToast("Auto-sync disabled.");
   }
 };
+
+window.ewsDiscoverScrollOff = function ewsDiscoverScrollOff() {
+  const content = document.getElementById("content");
+  const ptm     = document.getElementById("p-tm");
+  if (content) { content.style.overflowY = "hidden"; content.style.height = "100vh"; }
+  if (ptm)     { ptm.style.overflow = "hidden"; ptm.style.height = "100vh"; ptm.style.minHeight = ""; }
+}
+
+function ewsDiscoverScrollOn() {
+  const content = document.getElementById("content");
+  const ptm     = document.getElementById("p-tm");
+  if (content) { content.style.overflowY = "auto"; content.style.height = "100vh"; }
+  if (ptm)     { ptm.style.overflow = "visible"; ptm.style.height = "auto"; ptm.style.minHeight = "100vh"; }
+}
+document.addEventListener("click", (e) => {
+  const res = document.getElementById("ews-discover-results");
+  if (res && res.style.display !== "none" &&
+      !res.contains(e.target) && e.target.id !== "ews-discover-btn" &&
+      !e.target.closest("#ews-discover-btn")) {
+    res.style.display = "none";
+    ewsDiscoverScrollOff();
+  }
+});
 
 window.ewsDiscover = async function (btn) {
   const username = document.getElementById("ews-username")?.value?.trim();
@@ -788,14 +1089,15 @@ window.ewsDiscover = async function (btn) {
 
   const data = await api.ewsDiscover(email);
 
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-search"></i> Auto-detect server URL'; }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-search"></i> Auto-detect'; }
 
   if (data.error) { showToast(data.error); return; }
 
   const candidates = data.candidates || [];
   resDiv.style.display = "block";
-  resDiv.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Common EWS URLs for <strong>${escHtml(data.domain)}</strong> — click one to use it:</div>` +
-    candidates.map((c) => `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono);display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="color:var(--text);word-break:break-all">${escHtml(c)}</span><button class="sm" style="flex-shrink:0" onclick="document.getElementById('ews-url').value='${escHtml(c)}';document.getElementById('ews-discover-results').style.display='none'">Use</button></div>`).join("");
+  ewsDiscoverScrollOn();
+  resDiv.innerHTML = `<div style="font-size:12px;color:#93c5fd;margin-bottom:6px">Common EWS URLs for <strong style="color:#fff">${escHtml(data.domain)}</strong> — click one to use it:</div>` +
+    candidates.map((c) => `<div style="padding:5px 0;border-bottom:1px solid rgba(99,179,237,0.2);font-size:12px;font-family:var(--mono);display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="color:#e2e8f0;word-break:break-all">${escHtml(c)}</span><button class="sm" style="flex-shrink:0" onclick="document.getElementById('ews-url').value='${escHtml(c)}';document.getElementById('ews-discover-results').style.display='none';ewsDiscoverScrollOff()">Use</button></div>`).join("");
 };
 
 // ── Teams MOM — uses live EWS meetings (_sortedMeetings) ───────
@@ -1695,25 +1997,25 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("su-done")?.addEventListener("input",  autoStandup);
   document.getElementById("su-today")?.addEventListener("input", autoStandup);
 
-  // Outlook EWS status
+  // Restore Exchange state and navigate based on stored credentials
   const ewsCreds = ewsGetCreds();
-  const olHint   = document.getElementById("ol-ews-hint");
-  const olOk     = document.getElementById("ol-ews-ok");
-  if (ewsCreds.ewsUrl && olHint && olOk) { olHint.style.display = "none"; olOk.style.display = "inline"; }
-
-  // Restore EWS connection and auto-sync if previously connected
   const { ewsUrl, username, password } = ewsCreds;
+  ewsRestoreUI();
   if (ewsUrl && username && password) {
-    ewsRestoreUI();
-    // Auto-load meetings in background on startup
+    // Already connected — remove login-mode, show sidebar, go to Dashboard
+    document.getElementById("app")?.classList.remove("login-mode");
+    stopTmBackground();
+    navTo("ov");
+    // Auto-load meetings in background
     api.ewsMeetings({ ewsUrl, username, password }).then((data) => {
       if (data.error) return;
       _ewsMeetings = data.meetings || [];
       renderEWSMeetings(_ewsMeetings);
       updateOverviewStats(_ewsMeetings, null);
       renderOvUpcoming(_ewsMeetings);
-      const syncLbl = document.getElementById("ews-last-sync-lbl");
-      if (syncLbl) syncLbl.textContent = "Last synced: " + new Date().toLocaleTimeString("en-IN");
     });
+  } else {
+    // Not connected — start the AI background animation
+    startTmBackground();
   }
 });

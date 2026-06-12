@@ -80,6 +80,51 @@ export async function getMeetings(req, res) {
   }
 }
 
+// GET /api/teams/chats
+export async function getChats(req, res) {
+  const token = req.query.token || req.headers["x-ms-token"] || "";
+  if (!token) return res.status(400).json({ error: "No Microsoft 365 token. Connect via Graph Explorer first." });
+  const auth = { Authorization: bearer(token) };
+  try {
+    const resp = await fetch(
+      "https://graph.microsoft.com/v1.0/me/chats?$expand=members&$top=30&$orderby=lastUpdatedDateTime desc",
+      { headers: auth }
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      return res.json({ chats: data.value || [] });
+    }
+    const err = await resp.json();
+    const msg = err.error?.message || "Graph API error";
+    return res.status(resp.status).json({ error: msg });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+}
+
+// GET /api/teams/chats/:chatId/messages
+export async function getChatMessages(req, res) {
+  const token  = req.query.token || req.headers["x-ms-token"] || "";
+  const chatId = req.params.chatId;
+  if (!token)  return res.status(400).json({ error: "No Microsoft 365 token." });
+  if (!chatId) return res.status(400).json({ error: "Missing chatId." });
+  const auth = { Authorization: bearer(token) };
+  try {
+    const resp = await fetch(
+      `https://graph.microsoft.com/v1.0/me/chats/${chatId}/messages?$top=40`,
+      { headers: auth }
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      return res.json({ messages: data.value || [] });
+    }
+    const err = await resp.json();
+    return res.status(resp.status).json({ error: err.error?.message || "Graph API error" });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+}
+
 // POST /api/teams/mom
 export async function generateTeamsMOM(req, res) {
   const { subject, date, attendees, duration, context, transcript } = req.body;
