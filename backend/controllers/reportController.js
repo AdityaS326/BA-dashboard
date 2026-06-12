@@ -1,5 +1,5 @@
 ﻿// backend/controllers/reportController.js
-import { callGroq } from "../utils/groq.js";
+import { callAI } from "../utils/aiRouter.js";
 
 export async function generateReport(req, res) {
   const {
@@ -8,6 +8,7 @@ export async function generateReport(req, res) {
     week,
     manager = "Igor (Product Owner)",
     source = "claude",
+    provider = "groq",
   } = req.body;
 
   const today =
@@ -38,12 +39,13 @@ working on EEL (Enterprise Linux), GPOS Subscription Manager, BRD/FRD documentat
 Use formal third-person tone throughout. Be specific and realistic.`;
 
   try {
-    const text = await callGroq(
+    const text = await callAI(
       prompt,
-      "You are a professional report writer generating formal weekly work reports for enterprise software companies. Use formal third-person tone.",
-      3000
+      "You are a professional report writer generating formal weekly work reports for enterprise software companies. Use formal third-person tone. Structure each section with clear headings, bullet points, and complete sentences.",
+      4000,
+      provider
     );
-    res.json({ text, meta: { name, dept, week: today, manager } });
+    res.json({ text, provider, meta: { name, dept, week: today, manager } });
   } catch (err) {
     console.error("[reportController]", err.message);
     res.status(502).json({ error: err.message });

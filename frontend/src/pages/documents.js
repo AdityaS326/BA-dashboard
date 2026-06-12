@@ -1,16 +1,18 @@
 // frontend/src/pages/documents.js
+// Documents are user-managed and persisted to localStorage — no hardcoded data.
 
-export let DOCS = [
-  { n: "EEL OS Layer BRD",             v: "v1.2", s: "Approved",  d: "28 May 2026", desc: "Approved by Igor. Covers kernel modules, repo governance, and package signing policy.", url: "" },
-  { n: "GPOS Sub Manager BRD",         v: "v1.1", s: "Approved",  d: "02 Jun 2026", desc: "Candlepin integration, SSL config, Phase 3 scope defined. Signed off.", url: "" },
-  { n: "EEL OS Product Roadmap",       v: "v1.0", s: "Approved",  d: "28 May 2026", desc: "H1/H2 2026 roadmap. Signed off by Igor.", url: "" },
-  { n: "AHCP Infrastructure BRD",     v: "v1.0", s: "Pending",   d: "15 May 2026", desc: "Pending review from infrastructure team.", url: "" },
-  { n: "EEL FRD",                      v: "v0.9", s: "Draft",     d: "01 Jun 2026", desc: "Work in progress. Section 3 incomplete.", url: "" },
-  { n: "RTM — EEL Requirements",       v: "v1.0", s: "Pending",   d: "04 Jun 2026", desc: "Traceability matrix for all EEL BRD requirements.", url: "" },
-  { n: "EEL Bug Portal Design",        v: "v1.0", s: "Delivered", d: "28 May 2026", desc: "Dual portal — customer and admin console delivered.", url: "" },
-  { n: "VXLAN Architecture Blueprint", v: "v1.2", s: "Approved",  d: "13 Mar 2026", desc: "Network topology and VXLAN configuration blueprint.", url: "" },
-  { n: "EEL SLA Document",             v: "v1.0", s: "Approved",  d: "16 Mar 2026", desc: "SLA matrix for EEL support tiers and response times.", url: "" },
-];
+function loadDocs() {
+  try {
+    const raw = localStorage.getItem("ba_docs");
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveDocs() {
+  try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
+}
+
+export let DOCS = loadDocs();
 
 const BADGE_MAP = { Approved: "b-green", Pending: "b-amber", Draft: "b-amber", Delivered: "b-green", Overdue: "b-red" };
 
@@ -52,12 +54,13 @@ function showDocMenu(e, idx) {
 function editDoc(idx) {
   const d    = DOCS[idx];
   const name = prompt("Edit document name:", d.n);
-  if (name && name.trim()) { DOCS[idx].n = name.trim(); filterDocs(); }
+  if (name && name.trim()) { DOCS[idx].n = name.trim(); saveDocs(); filterDocs(); }
 }
 
 function deleteDoc(idx) {
   if (!confirm(`Delete "${DOCS[idx].n}"?`)) return;
   DOCS.splice(idx, 1);
+  saveDocs();
   filterDocs();
   const det = document.getElementById("doc-detail");
   if (det) det.style.display = "none";
@@ -85,6 +88,7 @@ export function addNewDoc() {
   if (!name) return;
   const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   DOCS.unshift({ n: name.trim(), v: "v1.0", s: "Draft", d: today, desc: "Newly added.", url: "" });
+  saveDocs();
   filterDocs();
 }
 
@@ -117,6 +121,8 @@ export function filterDocs() {
   const f = document.getElementById("doc-filter")?.value || "";
   const q = (document.getElementById("doc-search")?.value || "").toLowerCase();
   renderDocs(DOCS.filter((d) => (!f || d.s === f) && (!q || d.n.toLowerCase().includes(q))));
+  // Update doc chart and stat card whenever docs change
+  window._refreshDocStats?.();
 }
 
 window.showDocMenu = showDocMenu;
@@ -161,6 +167,7 @@ window.setDocUrl = function (realIdx) {
   const url = input.value.trim();
   if (realIdx >= 0 && realIdx < DOCS.length) {
     DOCS[realIdx].url = url;
+    saveDocs();
     filterDocs();
     window._showDocDetail(realIdx);
   }

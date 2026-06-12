@@ -50,11 +50,11 @@ async function post(endpoint, body) {
 }
 
 export const api = {
-  // General assistant chat
-  chat: (prompt, system) => post("/api/claude", { prompt, system }),
+  // General assistant chat — pass provider so backend routes to correct AI
+  chat: (prompt, system, provider) => post("/api/claude", { prompt, system, provider: provider || localStorage.getItem("ai_provider") || "groq" }),
 
   // Weekly report generation
-  generateReport: (data) => post("/api/report", data),
+  generateReport: (data) => post("/api/report", { ...data, provider: data.provider || localStorage.getItem("ai_provider") || "groq" }),
 
   // MOM (Minutes of Meeting)
   generateMom: (data) => post("/api/mom", data),

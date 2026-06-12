@@ -184,14 +184,18 @@ tbody tr:hover td { background: var(--surface2); }
 .sch-empty { font-size: 13px; color: var(--hint); text-align: center; padding: 20px 0; }
 
 /* ─── CHAT ───────────────────────────────────────────────────── */
-.chat-wrap { display: flex; flex-direction: column; height: 280px; }
+.chat-wrap { display: flex; flex-direction: column; height: 340px; }
 .chat-msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
-.chat-msg  { max-width: 87%; padding: 8px 12px; border-radius: var(--r); font-size: 13px; line-height: 1.5; }
+.chat-msg  { max-width: 92%; padding: 9px 13px; border-radius: var(--r); font-size: 13px; line-height: 1.6; }
 .chat-msg.user { background: var(--blue-bg); border: 1px solid var(--blue-border); align-self: flex-end; color: var(--blue-text); }
-.chat-msg.ai   { background: var(--surface2); border: 1px solid var(--border); align-self: flex-start; color: var(--text); }
-.msg-lbl { font-size: 10px; color: var(--muted); margin-bottom: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
-.chat-inp { display: flex; gap: 7px; margin-top: 9px; }
-.chat-inp input { flex: 1; margin: 0; }
+.chat-msg.ai   { background: var(--surface2); border: 1px solid var(--border); align-self: flex-start; color: var(--text); max-width: 98%; }
+.msg-lbl { font-size: 10px; color: var(--muted); margin-bottom: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.chat-inp { display: flex; gap: 7px; margin-top: 9px; align-items: flex-start; }
+.chat-inp > div { flex: 1; }
+.chat-inp input { width: 100%; margin: 0; box-sizing: border-box; }
+.chat-suggest-item { padding: 8px 12px; font-size: 12px; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; }
+.chat-suggest-item:last-child { border-bottom: none; }
+.chat-suggest-item:hover { background: var(--surface2); }
 
 /* ─── AVAILABILITY CARDS ─────────────────────────────────────── */
 .avail-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; }

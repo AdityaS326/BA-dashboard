@@ -14,7 +14,7 @@ function buildSOAP(startDate, endDate) {
   xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header>
-    <t:RequestServerVersion Version="Exchange2013_SP1"/>
+    <t:RequestServerVersion Version="Exchange2010_SP2"/>
   </soap:Header>
   <soap:Body>
     <m:FindItem Traversal="Shallow">
@@ -25,11 +25,8 @@ function buildSOAP(startDate, endDate) {
           <t:FieldURI FieldURI="calendar:Start"/>
           <t:FieldURI FieldURI="calendar:End"/>
           <t:FieldURI FieldURI="calendar:Location"/>
-          <t:FieldURI FieldURI="calendar:IsOnlineMeeting"/>
-          <t:FieldURI FieldURI="calendar:OnlineMeetingInternalLinks"/>
           <t:FieldURI FieldURI="calendar:RequiredAttendees"/>
           <t:FieldURI FieldURI="calendar:OptionalAttendees"/>
-          <t:FieldURI FieldURI="calendar:MyResponseType"/>
         </t:AdditionalProperties>
       </m:ItemShape>
       <m:CalendarView MaxReturnsTotal="50"
@@ -64,19 +61,12 @@ function parseXML(xml) {
     const start    = tag("Start");
     const end      = tag("End");
     const location = tag("Location");
-    const isOnline = tag("IsOnlineMeeting") === "true";
-    const response = tag("MyResponseType");
 
     if (!subject || !start) continue;
 
-    // Parse Teams join URL from OnlineMeetingInternalLinks (Exchange 2013+)
-    const linksBlock = block.match(/<t:OnlineMeetingInternalLinks[\s\S]*?<\/t:OnlineMeetingInternalLinks>/i);
-    const joinUrlFromLinks = linksBlock
-      ? (linksBlock[0].match(/<t:Url[^>]*>([\s\S]*?)<\/t:Url>/i) || [])[1] || ""
-      : "";
-    // Fallback: Teams URL embedded in the Location field
-    const joinUrlFromLocation = (location.match(/https:\/\/teams\.microsoft\.com\/[^\s<>"]+/) || [])[0] || "";
-    const joinUrl = joinUrlFromLinks || joinUrlFromLocation;
+    // Detect Teams meeting from URL in Location field
+    const joinUrl = (location.match(/https:\/\/teams\.microsoft\.com\/[^\s<>"]+/) || [])[0] || "";
+    const isOnline = joinUrl.length > 0;
 
     const attendeeNames = allTags("Name")
       .filter((n) => n && !n.includes("<"))
@@ -88,7 +78,7 @@ function parseXML(xml) {
       ? "N/A"
       : `${Math.round((endDt - startDt) / 60000)} min`;
 
-    meetings.push({ subject, start, end, dur, location, isOnline, joinUrl, attendees: attendeeNames, response });
+    meetings.push({ subject, start, end, dur, location, isOnline, joinUrl, attendees: attendeeNames });
   }
 
   return meetings.sort((a, b) => new Date(a.start) - new Date(b.start));
@@ -124,8 +114,8 @@ export async function getMeetings(req, res) {
   const now      = new Date();
   const start    = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000);
   const end      = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-  const startISO = start.toISOString().split(".")[0];
-  const endISO   = end.toISOString().split(".")[0];
+  const startISO = start.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const endISO   = end.toISOString().replace(/\.\d{3}Z$/, "Z");
   const body     = buildSOAP(startISO, endISO);
 
   try {
@@ -150,16 +140,17 @@ export async function getMeetings(req, res) {
     if (response.statusCode === 403) {
       return res.status(403).json({ error: "Access denied (403). Your account may not have EWS access enabled." });
     }
-    if (response.statusCode >= 400) {
-      return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}. Check the EWS URL.` });
+
+    const xml = response.body || "";
+
+    // SOAP fault check — Exchange often wraps faults inside a 500
+    if (xml.includes("soap:Fault") || xml.includes("<faultstring")) {
+      const fault = xml.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+      return res.status(500).json({ error: "Exchange SOAP error: " + (fault ? fault[1].trim() : "Unknown fault") });
     }
 
-    const xml = response.body;
-
-    // SOAP fault check
-    if (xml.includes("<faultstring>") || xml.includes("soap:Fault")) {
-      const fault = xml.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
-      return res.status(500).json({ error: "Exchange SOAP error: " + (fault ? fault[1] : "Unknown fault") });
+    if (response.statusCode >= 400) {
+      return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}. Check the EWS URL.` });
     }
 
     const meetings = parseXML(xml);
