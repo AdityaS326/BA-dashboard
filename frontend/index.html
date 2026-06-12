@@ -6,29 +6,31 @@
 <meta name="theme-color" content="#f8f9fb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>Falcon Dashboard — ESDS</title>
+<title>Falcon App</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='85'>🦅</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="src/styles/main.css">
 </head>
 <body>
-<div id="app">
+
+<div id="app" class="login-mode">
 
 <!-- SIDEBAR -->
 <nav id="sidebar">
   <div class="sb-brand">
-    <div class="sb-logo"><i class="ti ti-bolt" style="font-size:15px"></i></div>
-    <div class="sb-name-wrap"><div class="sb-title">Falcon Dashboard</div><div class="sb-sub">v3.0</div></div>
+    <div class="sb-logo" style="font-size:17px;line-height:1">🦅</div>
+    <div class="sb-name-wrap"><div class="sb-title">Falcon App</div><div class="sb-sub">v3.0</div></div>
   </div>
   <div class="sb-section">
     <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Overview</span></div>
-    <div class="nav-item active" data-panel="ov" onclick="nav(this)"><i class="ti ti-home"></i><span class="nav-lbl">Dashboard</span></div>
+    <div class="nav-item" data-panel="ov" onclick="nav(this)"><i class="ti ti-home"></i><span class="nav-lbl">Dashboard</span></div>
     <div class="nav-item" data-panel="cal" onclick="nav(this)"><i class="ti ti-calendar"></i><span class="nav-lbl">Calendar</span><span class="nav-badge" id="cal-badge">3</span></div>
   </div>
   <div class="sb-section">
     <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Integrations</span></div>
-    <div class="nav-item" data-panel="tm" onclick="nav(this)"><i class="ti ti-device-desktop"></i><span class="nav-lbl">Teams meetings</span></div>
+    <div class="nav-item" data-panel="tc" onclick="nav(this)"><i class="ti ti-brand-teams"></i><span class="nav-lbl">Teams Chat</span></div>
     <div class="nav-item" data-panel="ol" onclick="nav(this)"><i class="ti ti-mail"></i><span class="nav-lbl">Outlook inbox</span><span class="nav-badge" id="ol-badge" style="display:none">0</span></div>
     <div class="nav-item" data-panel="wr" onclick="nav(this)"><i class="ti ti-report"></i><span class="nav-lbl">Weekly report</span></div>
   </div>
@@ -52,7 +54,7 @@
 <div id="main">
   <div id="topbar">
     <div class="tb-left">
-      <span class="tb-page" id="page-title">Dashboard</span>
+      <span class="tb-page" id="page-title">Teams meetings</span>
     </div>
     <div class="tb-right">
       <span class="tb-pill" id="reminder-pill" style="display:none" onclick="nav(document.querySelector('[data-panel=cal]'))">
@@ -61,13 +63,195 @@
       <span class="tb-pill live"><i class="ti ti-circle-check" style="font-size:11px"></i> Live</span>
       <span class="tb-pill" id="topbar-time">--:--</span>
       <span class="tb-pill">Wk 24 · 2026</span>
+      <button onclick="ewsDisconnect()" title="Logout"
+        style="display:flex;align-items:center;gap:5px;padding:5px 11px;font-size:12px;font-weight:500;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;transition:all .15s"
+        onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'"
+        onmouseout="this.style.background='transparent';this.style.color='var(--muted)'">
+        <i class="ti ti-logout" style="font-size:13px"></i> Logout
+      </button>
     </div>
   </div>
 
   <div id="content">
 
+<!-- ██ TEAMS MEETINGS — WELCOME / ONBOARDING ██████████████████████████████ -->
+<div class="panel active" id="p-tm">
+
+  <!-- AI background canvas -->
+  <canvas id="tm-bg-canvas"></canvas>
+
+  <!-- Large background falcon silhouette — blue-on-blue tonal -->
+  <div id="tm-falcon-bg" style="position:fixed;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden">
+    <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg"
+         style="width:92vw;max-width:1100px;opacity:0.18">
+      <!-- Body -->
+      <path d="M500 240 Q493 275 490 320 Q492 365 500 410 Q508 365 510 320 Q507 275 500 240Z" fill="#2563eb"/>
+      <!-- Head -->
+      <ellipse cx="500" cy="220" rx="22" ry="28" fill="#2563eb"/>
+      <!-- Hooked beak -->
+      <path d="M514 208 Q540 220 522 234 Q516 222 514 208Z" fill="#2563eb"/>
+      <!-- Left wing upper -->
+      <path d="M492 295 Q455 265 385 252 Q305 238 210 252 Q130 264 55 278
+               Q105 292 175 293 Q255 294 335 282 Q405 272 452 278
+               Q466 290 468 308 Q456 334 432 355 Q400 376 362 390 Q330 400 298 404
+               Q342 402 385 390 Q428 376 460 354 Q480 338 490 316 Z" fill="#2563eb"/>
+      <!-- Left wing lower -->
+      <path d="M452 278 Q420 310 395 340 Q370 368 352 392
+               Q380 378 410 358 Q440 336 458 308 Z" fill="#1d4ed8" opacity="0.7"/>
+      <!-- Right wing upper -->
+      <path d="M508 295 Q545 265 615 252 Q695 238 790 252 Q870 264 945 278
+               Q895 292 825 293 Q745 294 665 282 Q595 272 548 278
+               Q534 290 532 308 Q544 334 568 355 Q600 376 638 390 Q670 400 702 404
+               Q658 402 615 390 Q572 376 540 354 Q520 338 510 316 Z" fill="#2563eb"/>
+      <!-- Right wing lower -->
+      <path d="M548 278 Q580 310 605 340 Q630 368 648 392
+               Q620 378 590 358 Q560 336 542 308 Z" fill="#1d4ed8" opacity="0.7"/>
+      <!-- Tail feathers -->
+      <path d="M493 408 Q484 448 474 490 Q482 484 488 490 Q491 468 494 450
+               Q497 468 500 490 Q503 468 506 450 Q509 468 512 490 Q518 484 526 490
+               Q516 448 507 408 Z" fill="#2563eb"/>
+    </svg>
+  </div>
+
+  <!-- ── SETUP FORM (not connected) ────────────────────────────── -->
+  <div id="ews-setup-form">
+
+    <!-- Welcome header — no icon, just text -->
+    <div id="tm-welcome-wrap" style="text-align:center;margin-bottom:30px">
+      <h2 style="font-size:36px;font-weight:800;margin:0 0 12px;letter-spacing:-.5px">Welcome to Falcon App</h2>
+      <p style="font-size:15px;margin:0;line-height:1.7">Connect your Exchange account to unlock meetings calendar and email features</p>
+    </div>
+
+    <div class="card">
+        <div class="card-hd" style="margin-bottom:16px">
+          <span class="card-title"><i class="ti ti-server"></i>Connect to Exchange</span>
+          <span id="ews-notconn-badge" class="badge" style="background:var(--surface2);color:var(--muted);font-size:10px">Not connected</span>
+        </div>
+
+        <!-- Steps -->
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">
+          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
+            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</span>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Enter your Exchange username / email</strong> — your corporate AD account (e.g. username@esds.co.in)</div>
+          </div>
+          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
+            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</span>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Auto-detect server URL</strong> — click <em>Auto-detect</em> or enter the EWS URL manually</div>
+          </div>
+          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
+            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</span>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Click Connect &amp; Sync</strong> — the app syncs your meetings, calendar and emails</div>
+          </div>
+        </div>
+
+        <!-- Credentials form -->
+        <label>Username / Email</label>
+        <input id="ews-username" placeholder="username@esds.co.in" style="margin-bottom:10px"
+          oninput="ewsCheckInputs()">
+
+        <label>Password</label>
+        <input id="ews-password" type="password" placeholder="Your Active Directory password" style="margin-bottom:10px"
+          oninput="ewsCheckInputs()"
+          onkeydown="if(event.key==='Enter' && !document.getElementById('ews-connect-btn').disabled) ewsConnect(document.getElementById('ews-connect-btn'))">
+
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <label style="margin:0;flex:1">Exchange server URL</label>
+          <button class="sm" onclick="ewsDiscover(this)" id="ews-discover-btn">
+            <i class="ti ti-search"></i> Auto-detect
+          </button>
+        </div>
+        <input id="ews-url" value="https://owa.esds.co.in/EWS/Exchange.asmx"
+          style="font-family:var(--mono);font-size:12px;margin-bottom:6px"
+          placeholder="https://owa.yourdomain.com/EWS/Exchange.asmx">
+        <div id="ews-discover-results" style="display:none;margin-bottom:10px"></div>
+
+        <div id="ews-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px;padding:8px 10px;background:rgba(220,38,38,.07);border-radius:var(--r-sm)"></div>
+
+        <button class="primary" id="ews-connect-btn" onclick="ewsConnect(this)" disabled
+          style="width:100%;justify-content:center;padding:13px;font-size:14px;font-weight:600;letter-spacing:.3px;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;box-shadow:0 4px 20px rgba(79,70,229,.45);margin-top:4px;transition:filter .15s,transform .15s,box-shadow .15s">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:7px;vertical-align:middle"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Connect &amp; Sync
+        </button>
+    </div>
+  </div>
+
+  <!-- ── CONNECTED STATE (after successful connect) ─────────────── -->
+  <div id="ews-connected-state" style="display:none">
+
+    <!-- Status bar -->
+    <div class="card" style="margin-bottom:14px;padding:11px 16px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="width:32px;height:32px;background:var(--green-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ti ti-circle-check" style="font-size:17px;color:var(--green)"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="ews-user-label">Connected</div>
+          <div style="font-size:11px;color:var(--muted)" id="ews-last-sync-lbl">Exchange active</div>
+        </div>
+        <span id="ews-status-badge" class="badge b-green" style="font-size:10px">Synced</span>
+        <button class="sm primary" onclick="ewsSync(this)"><i class="ti ti-refresh"></i> Sync now</button>
+        <button class="sm" onclick="ewsToggleAutoSync(this)" id="ews-autosync-btn"><i class="ti ti-refresh"></i> Auto-sync on</button>
+        <button class="sm" onclick="ewsDisconnect()" title="Sign out"><i class="ti ti-logout"></i> Sign out</button>
+      </div>
+    </div>
+
+    <!-- Two-column: meeting list + detail/MOM -->
+    <div class="g2">
+
+      <!-- Left: meeting list + ICS import -->
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-hd">
+            <span class="card-title"><i class="ti ti-calendar-event"></i>Meetings</span>
+            <span class="badge b-blue" id="meetings-count" style="display:none">0</span>
+          </div>
+          <div id="teams-list">
+            <div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center">
+              <i class="ti ti-calendar-import" style="display:block;font-size:24px;margin-bottom:8px;color:var(--border)"></i>
+              Syncing from Exchange…
+            </div>
+          </div>
+        </div>
+
+        <!-- ICS import -->
+        <div class="card">
+          <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-import"></i>Import .ics calendar</span></div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text)">
+              <i class="ti ti-upload"></i>
+              <span id="ics-file-name">Choose .ics file</span>
+              <input type="file" id="ics-file-input" accept=".ics" style="display:none" onchange="importICS(this)">
+            </label>
+            <button class="sm" onclick="clearICSMeetings()"><i class="ti ti-trash"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: meeting detail + MOM output -->
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-hd"><span class="card-title"><i class="ti ti-info-circle"></i>Meeting detail</span></div>
+          <div id="meeting-detail" style="font-size:13px;color:var(--muted)">Select a meeting to preview details and generate MOM.</div>
+        </div>
+        <div class="card" id="mom-tm-output" style="display:none">
+          <div class="card-hd">
+            <span class="card-title"><i class="ti ti-notes"></i>Minutes of Meeting</span>
+            <div style="display:flex;gap:5px">
+              <button class="sm" onclick="copyText('mom-tm-text')"><i class="ti ti-copy" style="font-size:12px"></i></button>
+              <button class="sm" onclick="downloadMOM()"><i class="ti ti-download" style="font-size:12px"></i></button>
+            </div>
+          </div>
+          <div class="term" id="mom-tm-text" style="min-height:80px"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
 <!-- ██ OVERVIEW ████████████████████████████████████████████████████████████ -->
-<div class="panel active" id="p-ov">
+<div class="panel" id="p-ov">
   <div id="ov-reminder"></div>
   <!-- Stat cards — all populated dynamically from EWS + DOCS -->
   <div class="g4">
@@ -133,174 +317,93 @@
   </div>
 </div>
 
-<!-- ██ TEAMS ████████████████████████████████████████████████████████████████ -->
-<div class="panel" id="p-tm">
+<!-- ██ TEAMS CHAT ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-tc">
 
-  <!-- ── EWS step-by-step guide ──────────────────────────────────── -->
-  <details style="margin-bottom:12px" id="ews-guide">
-    <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:500;color:var(--text)">
-      <i class="ti ti-info-circle" style="color:var(--blue);font-size:15px"></i>
-      How to connect Teams &amp; Outlook — step-by-step guide
-      <i class="ti ti-chevron-down" style="margin-left:auto;font-size:12px;color:var(--muted)"></i>
-    </summary>
-    <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);background:var(--card);padding:14px 16px;display:flex;flex-direction:column;gap:12px">
-      <div style="font-size:12px;color:var(--muted);line-height:1.65">Connects your dashboard to the ESDS on-premise Exchange server. No IT approval needed — uses your regular Outlook password.</div>
-
-      <div style="display:flex;gap:11px;align-items:flex-start">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Be on ESDS office WiFi or VPN</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.6">EWS only works on the internal ESDS network. If you're remote, connect to the ESDS VPN first, then come back here.</div>
-        </div>
+  <!-- Session bar -->
+  <div class="card" style="margin-bottom:14px;padding:11px 16px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="width:32px;height:32px;background:#6264a7;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="ti ti-brand-teams" style="font-size:17px;color:#fff"></i>
       </div>
-
-      <div style="display:flex;gap:11px;align-items:flex-start">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Check the Exchange server URL (below)</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.6">The URL is already pre-filled as <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px">https://owa.esds.co.in/EWS/Exchange.asmx</code>. Leave it as-is. If IT gave you a different URL, paste it there. You can also click <strong>Auto-detect server URL</strong> to find it automatically.</div>
-        </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="ews-user-label"></div>
+        <div style="font-size:11px;color:var(--muted)" id="tc-sync-lbl">Teams chats not synced yet</div>
       </div>
-
-      <div style="display:flex;gap:11px;align-items:flex-start">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Enter your Outlook username &amp; password</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.6">Use the same email and password you use at <strong>owa.esds.co.in</strong>. Your credentials are stored only in your browser — never sent to any third party.</div>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:11px;align-items:flex-start">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">4</div>
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Click "Connect &amp; sync"</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.6">Your Teams meetings for the next 30 days will load here. Enable <strong>Auto-sync every 5 min</strong> to keep the list fresh automatically.</div>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:11px;align-items:flex-start">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><i class="ti ti-check" style="font-size:12px"></i></div>
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Done — Outlook inbox &amp; Calendar also work now</div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.6">Go to <strong>Outlook inbox</strong> in the sidebar → click <strong>Load inbox</strong>. Go to <strong>Calendar</strong> → click <strong>Sync Exchange</strong>. Leave emails in the <strong>Leave &amp; resources</strong> panel also send via your connected account.</div>
-        </div>
-      </div>
-
-      <div style="padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.22);border-radius:var(--r-sm);margin-top:2px">
-        <div style="font-size:12px;font-weight:600;color:#b45309;margin-bottom:5px"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Troubleshooting</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.75">
-          <strong>HTTP 401</strong> — Wrong password. Log in to <em>owa.esds.co.in</em> in your browser first to verify credentials.<br>
-          <strong>HTTP 500</strong> — Server-side error. Wait a moment and try again. If it persists, ask IT if EWS is enabled for your account.<br>
-          <strong>Cannot find server / ENOTFOUND</strong> — Not on ESDS network or VPN. Connect first, then try again.<br>
-          <strong>No meetings showing</strong> — Connected successfully but no calendar events exist in the next 30 days.
-        </div>
-      </div>
-    </div>
-  </details>
-
-  <!-- ── EWS automatic sync card ─────────────────────────────────── -->
-  <div class="card" style="margin-bottom:12px" id="ews-card">
-    <div class="card-hd">
-      <span class="card-title"><i class="ti ti-server"></i>Auto-sync from Exchange</span>
-      <span class="badge b-green" id="ews-status-badge" style="display:none"><i class="ti ti-circle-check" style="font-size:10px"></i> Connected</span>
-      <span class="badge b-amber" id="ews-notconn-badge">Not connected</span>
-    </div>
-
-    <!-- Connected state -->
-    <div id="ews-connected-state" style="display:none">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:500;color:var(--text)" id="ews-user-label"></div>
-          <div style="font-size:11px;color:var(--muted)" id="ews-last-sync-lbl">Last synced: never</div>
-        </div>
-        <button class="sm primary" onclick="ewsSync(this)"><i class="ti ti-refresh"></i> Sync now</button>
-        <button class="sm" onclick="ewsDisconnect()"><i class="ti ti-plug-x"></i> Disconnect</button>
-      </div>
-      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--muted);margin:0">
-        <input type="checkbox" id="ews-auto-sync" style="width:auto;margin:0;cursor:pointer" onchange="ewsToggleAutoSync(this)">
-        Auto-sync every 5 minutes
-      </label>
-    </div>
-
-    <!-- Setup form -->
-    <div id="ews-setup-form">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.75">
-        Connects directly to the ESDS on-premise Exchange server — no admin approval, no tokens.<br>
-        Meetings load automatically. Credentials are stored only in your browser.
-      </div>
-      <label>Exchange server URL</label>
-      <input id="ews-url" value="https://owa.esds.co.in/EWS/Exchange.asmx" placeholder="https://owa.esds.co.in/EWS/Exchange.asmx">
-      <div class="g2" style="gap:8px">
-        <div>
-          <label>Username / Email</label>
-          <input id="ews-username" value="aditya.sridhar@esds.co.in" placeholder="aditya.sridhar@esds.co.in">
-        </div>
-        <div>
-          <label>Password</label>
-          <input type="password" id="ews-password" placeholder="Your Outlook / Windows password">
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--hint);margin-bottom:10px;display:flex;align-items:center;gap:4px">
-        <i class="ti ti-lock" style="font-size:11px"></i>
-        Stored in your browser only. Sent only to your own Exchange server — never to any third party.
-      </div>
-      <div class="btn-row">
-        <button class="primary" onclick="ewsConnect(this)"><i class="ti ti-plug"></i> Connect &amp; sync</button>
-        <button onclick="ewsDiscover(this)"><i class="ti ti-search"></i> Auto-detect server URL</button>
-      </div>
-      <div id="ews-error" style="display:none;margin-top:8px;font-size:12px;color:var(--red);padding:8px 10px;background:rgba(220,38,38,0.06);border-radius:var(--r-sm);border:1px solid rgba(220,38,38,0.15)"></div>
-      <div id="ews-discover-results" style="display:none;margin-top:8px"></div>
+      <button class="sm primary" id="tc-sync-btn" onclick="syncTeamsChats(this)">
+        <i class="ti ti-refresh"></i> Sync chats
+      </button>
+      <button class="sm" onclick="ewsDisconnect()" title="Sign out from Exchange">
+        <i class="ti ti-logout"></i> Sign out
+      </button>
     </div>
   </div>
 
-  <!-- ── ICS fallback (manual, collapsible) ─────────────────────── -->
-  <details style="margin-bottom:12px">
-    <summary style="font-size:12px;color:var(--muted);cursor:pointer;user-select:none;padding:4px 0;list-style:none;display:flex;align-items:center;gap:5px">
-      <i class="ti ti-chevron-right" style="font-size:11px" id="ics-chevron"></i>
-      <i class="ti ti-file-import" style="font-size:11px"></i>
-      Manual import from .ics file (fallback if EWS doesn't work)
-    </summary>
-    <div class="card" style="margin-top:8px;padding:12px">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.7">
-        In Outlook → <strong>File → Save Calendar</strong> → save as <code style="font-family:var(--mono);font-size:11px">.ics</code> → choose that file below.
+  <!-- No MS365 token — connect card -->
+  <div id="tc-no-token" class="card" style="margin-bottom:14px">
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <div style="width:40px;height:40px;background:rgba(98,100,167,.12);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+        <i class="ti ti-brand-teams" style="font-size:22px;color:#6264a7"></i>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <label class="primary sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--blue);color:#fff;border-radius:var(--r-sm);font-size:13px;font-weight:500">
-          <i class="ti ti-upload"></i> Choose .ics file
-          <input type="file" id="ics-file-input" accept=".ics" style="display:none" onchange="importICS(this)">
-        </label>
-        <span id="ics-file-name" style="font-size:12px;color:var(--muted)">No file chosen</span>
-        <button class="sm" onclick="clearICSMeetings()" style="margin-left:auto"><i class="ti ti-trash"></i> Clear</button>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:5px">Connect Microsoft 365 to sync Teams chats</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px">
+          Teams chats require a Microsoft 365 access token with <code style="font-family:var(--mono);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:3px">Chat.Read</code> permission.
+          Get a free token in 2 minutes — no admin approval needed.
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="primary sm" onclick="window.open('https://developer.microsoft.com/en-us/graph/graph-explorer','_blank')">
+            <i class="ti ti-external-link"></i> Open Graph Explorer
+          </button>
+          <button class="sm" onclick="tcToggleTokenInput()">
+            <i class="ti ti-key"></i> Paste access token
+          </button>
+        </div>
+
+        <div id="tc-token-input-area" style="display:none">
+          <input id="tc-token-input" placeholder="Paste Bearer token from Graph Explorer…"
+            style="font-family:var(--mono);font-size:11px;margin-bottom:6px">
+          <button class="primary sm" onclick="tcSaveToken()"><i class="ti ti-check"></i> Connect &amp; sync</button>
+        </div>
+
+        <!-- Steps -->
+        <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;font-size:11px;color:var(--muted);line-height:1.8;border:1px solid var(--border)">
+          <strong style="color:var(--text)">Quick steps:</strong>
+          1 · Open Graph Explorer → Sign in with your Microsoft account<br>
+          2 · Run: <code style="font-family:var(--mono);background:var(--surface);padding:1px 5px;border-radius:3px">GET https://graph.microsoft.com/v1.0/me/chats</code> — consent to <em>Chat.Read</em><br>
+          3 · Click your avatar → Access Token → Copy → paste it above
+        </div>
       </div>
     </div>
-  </details>
+  </div>
 
-  <!-- ── Meetings list + detail ─────────────────────────────────── -->
-  <div class="g2">
+  <!-- Chat list + messages (shown after sync) -->
+  <div id="tc-chat-ui" style="display:none" class="g2">
+    <!-- Left: conversation list -->
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-size:14px;font-weight:500;color:var(--text)">Scheduled meetings</span>
-        <span class="badge b-blue" id="meetings-count" style="display:none">0</span>
+        <span style="font-size:14px;font-weight:500;color:var(--text)">Conversations</span>
+        <span class="badge b-blue" id="tc-chat-count" style="display:none">0</span>
       </div>
-      <div id="teams-list">
+      <div id="tc-chat-list">
         <div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center">
-          <i class="ti ti-calendar-search" style="display:block;font-size:24px;margin-bottom:8px;color:var(--border)"></i>
-          Connect to Exchange above — meetings will load automatically.
+          <i class="ti ti-message-dots" style="display:block;font-size:26px;margin-bottom:8px;color:var(--border)"></i>
+          Click "Sync chats" to load your Teams conversations.
         </div>
       </div>
     </div>
+    <!-- Right: messages -->
     <div>
-      <div id="meeting-detail" class="card" style="font-size:13px;color:var(--muted);margin-bottom:10px">Select a meeting to preview details and generate MOM.</div>
-      <div id="mom-tm-output" style="display:none">
-        <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:7px">Generated MOM</div>
-        <div class="term" id="mom-tm-text" style="min-height:160px"></div>
-        <div class="btn-row">
-          <button onclick="copyText('mom-tm-text')"><i class="ti ti-copy"></i> Copy</button>
-          <button onclick="downloadMOM()"><i class="ti ti-download"></i> Download</button>
+      <div id="tc-messages-panel" class="card" style="font-size:13px;color:var(--muted);min-height:220px;display:flex;align-items:center;justify-content:center">
+        <div style="text-align:center">
+          <i class="ti ti-message-2" style="display:block;font-size:28px;margin-bottom:8px;color:var(--border)"></i>
+          Select a conversation to view messages
         </div>
       </div>
     </div>
   </div>
+
 </div>
 
 <!-- ██ WEEKLY REPORT ███████████████████████████████████████████████████████ -->

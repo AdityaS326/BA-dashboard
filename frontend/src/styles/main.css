@@ -219,10 +219,211 @@ tbody tr:hover td { background: var(--surface2); }
 /* ─── QUICK PROMPTS ──────────────────────────────────────────── */
 .quick-prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
+/* ─── SPIN ANIMATION ─────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── LOGIN PAGE ─────────────────────────────────────────────── */
+#login-page {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #0a0d14 0%, #141824 50%, #0a0d14 100%);
+  padding: 20px;
+}
+.lp-glow-1 {
+  position: absolute; top: -15%; left: -10%; width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(29,106,229,.18) 0%, transparent 70%);
+  border-radius: 50%; pointer-events: none;
+}
+.lp-glow-2 {
+  position: absolute; bottom: -15%; right: -10%; width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(5,150,105,.1) 0%, transparent 70%);
+  border-radius: 50%; pointer-events: none;
+}
+.lp-wrap { width: 100%; max-width: 420px; position: relative; }
+.lp-brand {
+  text-align: center; margin-bottom: 30px;
+}
+.lp-logo-row {
+  display: inline-flex; align-items: center; gap: 11px; margin-bottom: 20px;
+}
+.lp-logo-icon {
+  width: 44px; height: 44px; background: #1d6ae5;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 18px rgba(29,106,229,.45); flex-shrink: 0;
+}
+.lp-logo-icon i { font-size: 22px; color: #fff; }
+.lp-app-name { font-size: 17px; font-weight: 700; color: #f1f5f9; letter-spacing: -.2px; }
+.lp-app-org  { font-size: 11px; color: #475569; margin-top: 1px; }
+.lp-title    { font-size: 26px; font-weight: 700; color: #f1f5f9; letter-spacing: -.5px; margin-bottom: 8px; }
+.lp-sub      { font-size: 14px; color: #64748b; }
+.lp-card {
+  background: #161926; border: 1px solid rgba(255,255,255,.07);
+  border-radius: 16px; padding: 28px 28px 24px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.5);
+}
+.lp-label {
+  display: block; font-size: 12px; font-weight: 500;
+  color: #94a3b8; margin-bottom: 6px; letter-spacing: .03em;
+}
+.lp-input {
+  width: 100%; background: #0d1017; border: 1px solid rgba(255,255,255,.09);
+  border-radius: 8px; padding: 10px 13px; font-size: 14px; color: #f1f5f9;
+  outline: none; transition: border-color .15s; font-family: var(--sans);
+  box-sizing: border-box;
+}
+.lp-input::placeholder { color: #374151; }
+.lp-input:focus { border-color: #1d6ae5; box-shadow: 0 0 0 3px rgba(29,106,229,.15); }
+.lp-hint {
+  font-size: 11px; color: #374151;
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 6px; margin-bottom: 20px;
+}
+.lp-btn {
+  width: 100%; background: #1d6ae5; color: #fff; border: none;
+  border-radius: 8px; padding: 12px 0; font-size: 14px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  gap: 8px; transition: background .15s, transform .1s; letter-spacing: .01em;
+}
+.lp-btn:hover:not(:disabled) { background: #1a5fd0; transform: translateY(-1px); }
+.lp-btn:active:not(:disabled) { transform: translateY(0); }
+.lp-btn:disabled { opacity: .65; cursor: not-allowed; }
+.lp-error {
+  display: none; margin-top: 12px; font-size: 12px; color: #f87171;
+  padding: 10px 12px; background: rgba(248,113,113,.08);
+  border-radius: 8px; border: 1px solid rgba(248,113,113,.2); line-height: 1.5;
+}
+.lp-footer {
+  text-align: center; margin-top: 16px;
+  font-size: 11px; color: #1f2937; line-height: 1.8;
+}
+.lp-advanced summary {
+  font-size: 12px; color: #374151; cursor: pointer; list-style: none;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 10px; user-select: none;
+}
+.lp-advanced summary::-webkit-details-marker { display: none; }
+.lp-adv-card {
+  background: #161926; border: 1px solid rgba(255,255,255,.07);
+  border-radius: 10px; padding: 14px 16px; margin-top: 4px;
+}
+.lp-adv-input {
+  width: 100%; background: #0d1017; border: 1px solid rgba(255,255,255,.09);
+  border-radius: 6px; padding: 8px 10px; font-size: 11px;
+  color: #94a3b8; font-family: var(--mono); outline: none;
+  margin-bottom: 8px; box-sizing: border-box; transition: border-color .15s;
+}
+.lp-adv-input:focus { border-color: #1d6ae5; }
+
 /* ─── SCROLLBAR ──────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ─── LOGIN MODE (sidebar + topbar hidden, full-screen) ─────── */
+#app.login-mode #sidebar  { display: none; }
+#app.login-mode #main     { width: 100%; height: 100vh; overflow: hidden; }
+#app.login-mode #topbar   { display: none; }
+#app.login-mode #content  { padding: 0; overflow: hidden; height: 100vh; flex: none; }
+
+/* Full-screen blue gradient panel — fixed, no scroll */
+#app.login-mode #p-tm {
+  background: linear-gradient(135deg, #040c20 0%, #091640 40%, #0d2578 100%);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* AI particle canvas — fixed to fill panel */
+#tm-bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Welcome text */
+#app.login-mode #tm-welcome-wrap {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-bottom: 30px;
+  width: 100%;
+  max-width: 700px;
+}
+#app.login-mode #tm-welcome-wrap h2 {
+  color: #ffffff !important;
+  text-shadow: 0 0 40px rgba(147,197,253,.6), 0 2px 8px rgba(0,0,0,.4);
+}
+#app.login-mode #tm-welcome-wrap p { color: #bfdbfe !important; font-size: 15px; }
+
+/* Form wrapper above canvas */
+#app.login-mode #ews-setup-form {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 700px;
+}
+
+/* Dark glassmorphism card */
+#app.login-mode #ews-setup-form .card {
+  background: rgba(5, 15, 50, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(99, 179, 237, 0.22);
+  box-shadow: 0 8px 48px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* All text inside form card */
+#app.login-mode #ews-setup-form .card-title { color: #e8f1ff !important; font-size: 13px !important; }
+#app.login-mode #ews-setup-form label       { color: #93c5fd !important; font-size: 13px !important; font-weight: 500 !important; }
+#app.login-mode #ews-setup-form strong      { color: #ffffff !important; }
+
+/* Step boxes */
+#app.login-mode #ews-setup-form .step-box {
+  background: rgba(147,197,253,0.07) !important;
+  border: 1px solid rgba(147,197,253,0.2) !important;
+}
+#app.login-mode #ews-setup-form .step-box .step-text {
+  color: #cbd5e1 !important;
+  font-size: 13px !important;
+}
+
+/* Inputs */
+#app.login-mode #ews-setup-form input {
+  background: rgba(255,255,255,0.07) !important;
+  border-color: rgba(99,179,237,0.28) !important;
+  color: #e2e8f0 !important;
+}
+#app.login-mode #ews-setup-form input::placeholder { color: #3d5a80 !important; }
+#app.login-mode #ews-setup-form input:focus { border-color: rgba(99,179,237,0.65) !important; box-shadow: 0 0 0 3px rgba(99,179,237,0.12); }
+
+/* Badge */
+#app.login-mode #ews-setup-form .badge { background: rgba(99,179,237,0.12) !important; color: #93c5fd !important; border-color: rgba(99,179,237,0.22) !important; }
+
+/* Error text */
+#app.login-mode #ews-error { color: #fca5a5 !important; background: rgba(220,38,38,.15) !important; }
+
+/* Connect button — disabled state */
+#app.login-mode #ews-connect-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #1e3a6e, #312e6e) !important;
+}
+/* Connect button — hover when enabled */
+#app.login-mode #ews-connect-btn:not(:disabled):hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(79,70,229,.65) !important;
+  transition: filter .15s, transform .15s, box-shadow .15s;
+}
 
 /* ─── RESPONSIVE ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
