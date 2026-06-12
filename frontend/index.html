@@ -69,45 +69,37 @@
 <!-- ██ OVERVIEW ████████████████████████████████████████████████████████████ -->
 <div class="panel active" id="p-ov">
   <div id="ov-reminder"></div>
+  <!-- Stat cards — all populated dynamically from EWS + DOCS -->
   <div class="g4">
-    <div class="stat-card blue"><div class="stat-label"><i class="ti ti-briefcase"></i>Active projects</div><div class="stat-value">3</div><div class="stat-sub">EEL · GPOS · AIOps</div></div>
-    <div class="stat-card green"><div class="stat-label"><i class="ti ti-file-check"></i>Docs approved</div><div class="stat-value">7</div><div class="stat-sub">BRD · FRD · Roadmap</div></div>
-    <div class="stat-card amber"><div class="stat-label"><i class="ti ti-clock"></i>Pending sign-offs</div><div class="stat-value">2</div><div class="stat-sub">FRD v1.2 · RTM</div></div>
-    <div class="stat-card red"><div class="stat-label"><i class="ti ti-alert-triangle"></i>Open risks</div><div class="stat-value">3</div><div class="stat-sub">2 high · 1 medium</div></div>
+    <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar-event"></i>Meetings today</div><div class="stat-value" id="stat-today-meetings">—</div><div class="stat-sub" id="stat-today-sub">Connect Exchange</div></div>
+    <div class="stat-card green"><div class="stat-label"><i class="ti ti-calendar-week"></i>This week</div><div class="stat-value" id="stat-week-meetings">—</div><div class="stat-sub" id="stat-week-sub">Connect Exchange</div></div>
+    <div class="stat-card amber"><div class="stat-label"><i class="ti ti-file-check"></i>Documents tracked</div><div class="stat-value" id="stat-docs">0</div><div class="stat-sub" id="stat-docs-sub">Add in Documents tab</div></div>
+    <div class="stat-card red"><div class="stat-label"><i class="ti ti-mail"></i>Unread emails</div><div class="stat-value" id="stat-unread">—</div><div class="stat-sub" id="stat-unread-sub">Connect Exchange</div></div>
   </div>
   <div class="g2">
     <div class="card">
       <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-event"></i>Today's meetings</span><span class="badge b-blue" id="today-count">—</span></div>
-      <div id="ov-meetings"></div>
+      <div id="ov-meetings"><div style="font-size:13px;color:var(--muted);padding:16px 0;text-align:center"><i class="ti ti-plug" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Exchange in Teams panel to see today's meetings</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><span class="card-title"><i class="ti ti-flag"></i>Milestones</span><span class="badge b-blue">5 total</span></div>
-      <div class="tl-item"><div class="tl-dot done"><i class="ti ti-check" style="font-size:9px"></i></div><div><div class="tl-title">EEL BRD sign-off</div><div class="tl-meta">28 May 2026 · complete</div></div></div>
-      <div class="tl-item"><div class="tl-dot done"><i class="ti ti-check" style="font-size:9px"></i></div><div><div class="tl-title">GPOS BRD v1.1 & v1.2</div><div class="tl-meta">02 Jun 2026 · complete</div></div></div>
-      <div class="tl-item"><div class="tl-dot wip">~</div><div><div class="tl-title">SIT testing</div><div class="tl-meta">In progress · due 20 Jun</div></div></div>
-      <div class="tl-item"><div class="tl-dot todo">○</div><div><div class="tl-title">UAT sign-off</div><div class="tl-meta">Upcoming · 05 Jul 2026</div></div></div>
-      <div class="tl-item"><div class="tl-dot todo">○</div><div><div class="tl-title">Production go-live</div><div class="tl-meta">Upcoming · 10 Jul 2026</div></div></div>
+      <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-time"></i>Upcoming meetings</span><span class="badge b-blue" id="upcoming-count">—</span></div>
+      <div id="ov-upcoming"><div style="font-size:13px;color:var(--muted);padding:16px 0;text-align:center"><i class="ti ti-plug" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Exchange to see upcoming meetings</div></div>
     </div>
   </div>
   <div class="g2">
     <div class="card">
-      <div class="card-hd"><span class="card-title"><i class="ti ti-chart-bar"></i>Project health</span><select id="ph-filter" onchange="updateHealthChart()" style="width:auto;font-size:11px;margin:0;padding:3px 8px"><option value="all">All projects</option><option value="eel">EEL</option><option value="gpos">GPOS</option></select></div>
-      <div id="health-bars">
-        <div class="prog-row"><div class="prog-label"><span>EEL OS product</span><span style="color:var(--green);font-weight:500">82%</span></div><div class="prog-bar"><div class="prog-fill" style="width:82%;background:var(--green)"></div></div></div>
-        <div class="prog-row" id="ph-gpos"><div class="prog-label"><span>GPOS sub manager</span><span style="color:var(--blue);font-weight:500">71%</span></div><div class="prog-bar"><div class="prog-fill" style="width:71%;background:var(--blue)"></div></div></div>
-        <div class="prog-row" id="ph-aiops"><div class="prog-label"><span>Enlight AIOps</span><span style="color:var(--amber);font-weight:500">45%</span></div><div class="prog-bar"><div class="prog-fill" style="width:45%;background:var(--amber)"></div></div></div>
-        <div class="prog-row" id="ph-bug"><div class="prog-label"><span>EEL bug portal</span><span style="color:var(--blue);font-weight:500">60%</span></div><div class="prog-bar"><div class="prog-fill" style="width:60%;background:var(--blue)"></div></div></div>
-      </div>
-      <div style="position:relative;height:100px;margin-top:10px"><canvas id="health-chart" role="img" aria-label="Project health bar chart: EEL 82%, GPOS 71%, AIOps 45%, Bug Portal 60%">EEL 82%, GPOS 71%, AIOps 45%, Bug Portal 60%</canvas></div>
+      <div class="card-hd"><span class="card-title"><i class="ti ti-chart-bar"></i>Meeting activity this week</span></div>
+      <div id="meeting-activity"><div style="font-size:12px;color:var(--muted);text-align:center;padding:32px 0"><i class="ti ti-plug" style="font-size:22px;display:block;margin-bottom:6px;color:var(--border)"></i>Sync Exchange to see meeting activity</div></div>
+      <div style="position:relative;height:90px;margin-top:8px;display:none" id="health-chart-wrap"><canvas id="health-chart"></canvas></div>
     </div>
     <div class="card">
       <div class="card-hd"><span class="card-title"><i class="ti ti-chart-donut"></i>Document status</span></div>
       <div style="display:flex;gap:14px;align-items:center">
-        <div style="position:relative;width:90px;height:90px;flex-shrink:0"><canvas id="doc-chart" role="img" aria-label="Donut: approved 13, pending 4, overdue 1">Approved 13, Pending 4, Overdue 1</canvas></div>
+        <div style="position:relative;width:90px;height:90px;flex-shrink:0"><canvas id="doc-chart"></canvas></div>
         <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
-          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#059669;flex-shrink:0"></span><span style="color:var(--muted)">Approved</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right">13</span></div>
-          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#d97706;flex-shrink:0"></span><span style="color:var(--muted)">Pending</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right">4</span></div>
-          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;flex-shrink:0"></span><span style="color:var(--muted)">Overdue</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right">1</span></div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#059669;flex-shrink:0"></span><span style="color:var(--muted)">Approved</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right" id="doc-count-approved">0</span></div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#d97706;flex-shrink:0"></span><span style="color:var(--muted)">Pending/Draft</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right" id="doc-count-pending">0</span></div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;flex-shrink:0"></span><span style="color:var(--muted)">Overdue</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right" id="doc-count-overdue">0</span></div>
         </div>
       </div>
     </div>
@@ -143,6 +135,68 @@
 
 <!-- ██ TEAMS ████████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-tm">
+
+  <!-- ── EWS step-by-step guide ──────────────────────────────────── -->
+  <details style="margin-bottom:12px" id="ews-guide">
+    <summary style="display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:500;color:var(--text)">
+      <i class="ti ti-info-circle" style="color:var(--blue);font-size:15px"></i>
+      How to connect Teams &amp; Outlook — step-by-step guide
+      <i class="ti ti-chevron-down" style="margin-left:auto;font-size:12px;color:var(--muted)"></i>
+    </summary>
+    <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);background:var(--card);padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:12px;color:var(--muted);line-height:1.65">Connects your dashboard to the ESDS on-premise Exchange server. No IT approval needed — uses your regular Outlook password.</div>
+
+      <div style="display:flex;gap:11px;align-items:flex-start">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Be on ESDS office WiFi or VPN</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">EWS only works on the internal ESDS network. If you're remote, connect to the ESDS VPN first, then come back here.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:11px;align-items:flex-start">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Check the Exchange server URL (below)</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">The URL is already pre-filled as <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px">https://owa.esds.co.in/EWS/Exchange.asmx</code>. Leave it as-is. If IT gave you a different URL, paste it there. You can also click <strong>Auto-detect server URL</strong> to find it automatically.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:11px;align-items:flex-start">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Enter your Outlook username &amp; password</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Use the same email and password you use at <strong>owa.esds.co.in</strong>. Your credentials are stored only in your browser — never sent to any third party.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:11px;align-items:flex-start">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">4</div>
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Click "Connect &amp; sync"</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Your Teams meetings for the next 30 days will load here. Enable <strong>Auto-sync every 5 min</strong> to keep the list fresh automatically.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:11px;align-items:flex-start">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><i class="ti ti-check" style="font-size:12px"></i></div>
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px">Done — Outlook inbox &amp; Calendar also work now</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">Go to <strong>Outlook inbox</strong> in the sidebar → click <strong>Load inbox</strong>. Go to <strong>Calendar</strong> → click <strong>Sync Exchange</strong>. Leave emails in the <strong>Leave &amp; resources</strong> panel also send via your connected account.</div>
+        </div>
+      </div>
+
+      <div style="padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.22);border-radius:var(--r-sm);margin-top:2px">
+        <div style="font-size:12px;font-weight:600;color:#b45309;margin-bottom:5px"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Troubleshooting</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.75">
+          <strong>HTTP 401</strong> — Wrong password. Log in to <em>owa.esds.co.in</em> in your browser first to verify credentials.<br>
+          <strong>HTTP 500</strong> — Server-side error. Wait a moment and try again. If it persists, ask IT if EWS is enabled for your account.<br>
+          <strong>Cannot find server / ENOTFOUND</strong> — Not on ESDS network or VPN. Connect first, then try again.<br>
+          <strong>No meetings showing</strong> — Connected successfully but no calendar events exist in the next 30 days.
+        </div>
+      </div>
+    </div>
+  </details>
 
   <!-- ── EWS automatic sync card ─────────────────────────────────── -->
   <div class="card" style="margin-bottom:12px" id="ews-card">
@@ -267,6 +321,12 @@
       </div>
       <div class="card">
         <div class="card-hd"><span class="card-title"><i class="ti ti-settings"></i>Options</span></div>
+        <label>AI model</label>
+        <select id="rp-provider" style="margin-bottom:10px" onchange="localStorage.setItem('ai_provider',this.value)">
+          <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+          <option value="openai">🤖 ChatGPT — GPT-4o</option>
+          <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+        </select>
         <label>History source</label>
         <select id="rp-source" style="margin-bottom:10px"><option value="claude">Claude history (7 days)</option><option value="chatgpt">ChatGPT history (7 days)</option><option value="both">Combined — Claude + ChatGPT</option></select>
         <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
@@ -452,7 +512,17 @@
       <label>To (Manager email)</label><input type="email" id="lv-to-email" placeholder="vijay.baskar@esds.co.in" value="vijay.baskar@esds.co.in">
       <label>CC (HR email)</label><input type="email" id="lv-cc-email" placeholder="hr@esds.co.in" value="hr@esds.co.in">
       <div class="btn-row"><button class="primary" onclick="generateLeaveEmail()"><i class="ti ti-mail"></i> Generate email</button><button onclick="sendLeaveEmail(this)"><i class="ti ti-send"></i> Send via Outlook</button></div>
-      <div class="term" id="lv-output" style="display:none;min-height:50px"></div>
+      <div id="lv-email-controls" style="display:none;margin-top:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:11px;color:var(--muted)"><i class="ti ti-pencil" style="font-size:10px"></i> Click the text below to edit manually</span>
+          <div style="display:flex;gap:5px">
+            <button class="sm" onclick="generateLeaveEmail()"><i class="ti ti-refresh"></i> Regenerate</button>
+            <button class="sm" onclick="clearLeaveEmail()"><i class="ti ti-trash"></i> Clear</button>
+            <button class="sm" onclick="copyText('lv-output')"><i class="ti ti-copy"></i> Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="term" id="lv-output" contenteditable="true" spellcheck="true" style="display:none;min-height:80px;cursor:text;outline:none;white-space:pre-wrap"></div>
     </div>
   </div>
 </div>
@@ -491,13 +561,24 @@
 <!-- ██ ASSISTANT ███████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-ai">
   <div class="card" style="margin-bottom:10px">
-    <div class="card-hd"><span class="card-title"><i class="ti ti-message-dots"></i>General assistant</span><button class="sm" onclick="clearChat()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button></div>
+    <div class="card-hd">
+      <span class="card-title"><i class="ti ti-message-dots"></i>General assistant</span>
+      <select id="ai-provider-select" onchange="setAIProvider(this.value)" style="width:auto;font-size:11px;margin:0;padding:3px 8px;border-radius:var(--r-sm)">
+        <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+        <option value="openai">🤖 ChatGPT — GPT-4o</option>
+        <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+      </select>
+      <button class="sm" onclick="clearChat()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button>
+    </div>
     <div class="chat-wrap">
       <div class="chat-msgs" id="chat-messages">
-        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi Aditya! I can help with anything — BRDs, user stories, emails, risk analysis, planning, or any professional task. What would you like to work on?</div>
+        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi Aditya! I can help with BRDs, user stories, emails, risk analysis, RTMs, stakeholder mapping, and any BA task. I give detailed, structured responses. What would you like to work on?</div>
       </div>
-      <div class="chat-inp">
-        <input id="chat-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+      <div class="chat-inp" style="position:relative">
+        <div style="position:relative;flex:1">
+          <input id="chat-input" placeholder="Ask anything… (suggestions appear as you type)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){sendChatMessage()}else if(event.key==='Escape'){document.getElementById('chat-suggestions').style.display='none'}" oninput="chatAutocomplete(this.value)">
+          <div id="chat-suggestions" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;overflow:hidden"></div>
+        </div>
         <button class="primary" onclick="sendChatMessage()" aria-label="Send"><i class="ti ti-send"></i></button>
       </div>
     </div>

@@ -4,7 +4,7 @@
 import { api }                  from "./utils/api.js";
 import { typeIn, copyText, showToast, escHtml } from "./utils/ui.js";
 import { seedEvents, todayKey } from "./utils/calendar.js";
-import { renderOvMeetings, initHealthChart, initDocChart, filterHealthChart } from "./pages/overview.js";
+import { renderOvMeetings, renderOvUpcoming, updateOverviewStats, initDocChart, updateDocChart, initHealthChart, filterHealthChart } from "./pages/overview.js";
 import { renderCalendar, renderSchedule, calNav as _calNav, addEvent as _addEvent, checkAndShowReminder } from "./pages/calendar.js";
 import { DOCS, renderDocs, filterDocs, addNewDoc } from "./pages/documents.js";
 
@@ -718,6 +718,8 @@ window.ewsConnect = async function (btn) {
 
   _ewsMeetings = data.meetings || [];
   renderEWSMeetings(_ewsMeetings);
+  updateOverviewStats(_ewsMeetings, null);
+  renderOvUpcoming(_ewsMeetings);
 
   const syncLbl = document.getElementById("ews-last-sync-lbl");
   if (syncLbl) syncLbl.textContent = "Last synced: " + new Date().toLocaleTimeString("en-IN");
@@ -739,6 +741,8 @@ window.ewsSync = async function (btn) {
 
   _ewsMeetings = data.meetings || [];
   renderEWSMeetings(_ewsMeetings);
+  updateOverviewStats(_ewsMeetings, null);
+  renderOvUpcoming(_ewsMeetings);
 
   const syncLbl = document.getElementById("ews-last-sync-lbl");
   if (syncLbl) syncLbl.textContent = "Last synced: " + new Date().toLocaleTimeString("en-IN");
@@ -794,34 +798,25 @@ window.ewsDiscover = async function (btn) {
     candidates.map((c) => `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono);display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="color:var(--text);word-break:break-all">${escHtml(c)}</span><button class="sm" style="flex-shrink:0" onclick="document.getElementById('ews-url').value='${escHtml(c)}';document.getElementById('ews-discover-results').style.display='none'">Use</button></div>`).join("");
 };
 
-// ── Teams MOM ──────────────────────────────────────────────────
-const TEAMS_MEETINGS = [
-  { t: "EEL architecture review", d: "03 Jun 2026", dur: "45 min", att: "Igor, Tushar, Aditya S, Vijay", ctx: "EEL OS layer BRD confirmation, VXLAN Phase 2, Sub manager POC deadline 15 Jun" },
-  { t: "GPOS sub manager demo",   d: "02 Jun 2026", dur: "60 min", att: "Sahil, Aditya S, Vijay, Igor",  ctx: "Full demo walkthrough, candlepin integration, SSL cert fix, Phase 3 scope discussion" },
-  { t: "Infrastructure blueprint",d: "01 Jun 2026", dur: "30 min", att: "Tushar, Aditya S, Igor",        ctx: "AHCP blueprint review, network topology, rack layout approval" },
-  { t: "Weekly stand-up",         d: "09 Jun 2026", dur: "15 min", att: "Full team",                     ctx: "Status updates, SIT blocker raised, UAT prep timeline discussed" },
-];
-window.selectMeeting = function (el, i) {
-  document.querySelectorAll(".meet-row").forEach((r) => r.classList.remove("sel"));
-  el.classList.add("sel");
-  const m   = TEAMS_MEETINGS[i];
-  const det = document.getElementById("meeting-detail");
-  if (!det) return;
-  det.innerHTML = `<div style="font-size:14px;font-weight:500;margin-bottom:5px">${m.t}</div><div style="font-size:12px;color:var(--muted);margin-bottom:7px">${m.d} · ${m.dur} · ${m.att}</div><div style="font-size:13px;color:var(--muted);margin-bottom:11px">${m.ctx}</div><button class="primary" onclick="generateTeamsMOM(${i})"><i class="ti ti-bolt"></i> Generate MOM</button>`;
-};
+// ── Teams MOM — uses live EWS meetings (_sortedMeetings) ───────
 window.generateTeamsMOM = async function (i) {
-  const m   = TEAMS_MEETINGS[i];
+  const m   = _sortedMeetings[i] || _ewsMeetings[i];
+  if (!m) return;
   const out = document.getElementById("mom-tm-output");
   const txt = document.getElementById("mom-tm-text");
   if (out) out.style.display = "block";
-  if (txt) txt.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating MOM...`;
-  const data = await api.generateMom({ title: m.t, date: m.d, attendees: m.att, objective: m.ctx });
+  if (txt) txt.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating MOM…`;
+  const start   = new Date(m.start);
+  const dateStr = isNaN(start) ? m.start : start.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const atts    = (m.attendees || []).join(", ");
+  const data = await api.generateMom({
+    title:     m.subject,
+    date:      dateStr,
+    attendees: atts,
+    objective: m.location || m.joinUrl || "See calendar invite",
+    provider:  localStorage.getItem("ai_provider") || "groq",
+  });
   if (txt) typeIn(txt, data.text || data.error || "Error generating MOM");
-};
-window.refreshMeetings = function (btn) {
-  if (!btn) return;
-  btn.innerHTML = '<i class="ti ti-refresh" style="font-size:13px;animation:spin .7s linear infinite"></i>';
-  setTimeout(() => btn.innerHTML = '<i class="ti ti-refresh" style="font-size:13px"></i>', 1200);
 };
 
 // ── Teams — sync real meetings from Microsoft 365 ──────────────
@@ -921,6 +916,7 @@ window.syncEWSEmails = async function (btn) {
   const badge  = document.getElementById("ol-badge");
   const unread = emails.filter((e) => !e.isRead).length;
   if (badge) { badge.textContent = unread; badge.style.display = unread ? "inline" : "none"; }
+  updateOverviewStats(_ewsMeetings, unread);
 
   if (!emails.length) {
     list.innerHTML = '<div style="font-size:12px;color:var(--hint);padding:16px 0;text-align:center">No emails in inbox.</div>';
@@ -1185,6 +1181,8 @@ window.syncOutlookCalendar = async function (btn) {
   if (data.error) { showToast("Calendar sync error: " + data.error); return; }
   _ewsMeetings = data.meetings || [];
   renderEWSMeetings(_ewsMeetings);
+  updateOverviewStats(_ewsMeetings, null);
+  renderOvUpcoming(_ewsMeetings);
   const statusEl = document.getElementById("cal-sync-status");
   if (statusEl) statusEl.textContent = `Last synced: ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · ${_ewsMeetings.length} event(s)`;
   showToast(`Calendar synced — ${_ewsMeetings.length} event(s) from Exchange.`);
@@ -1201,13 +1199,16 @@ window.wrTab = function (el, tab) {
 window.generateReport = async function () {
   const t = document.getElementById("rp-output");
   if (!t) return;
-  t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Scanning AI history and generating report...`;
+  const provider = document.getElementById("rp-provider")?.value || localStorage.getItem("ai_provider") || "groq";
+  const labels = { groq: "Groq · LLaMA 3.3 70B", openai: "ChatGPT · GPT-4o", anthropic: "Claude · Sonnet 4.6" };
+  t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating report with ${labels[provider] || provider}…`;
   const data = await api.generateReport({
-    name:    document.getElementById("rp-name")?.value,
-    dept:    document.getElementById("rp-dept")?.value,
-    week:    document.getElementById("rp-week")?.value,
-    manager: document.getElementById("rp-mgr")?.value,
-    source:  document.getElementById("rp-source")?.value,
+    name:     document.getElementById("rp-name")?.value,
+    dept:     document.getElementById("rp-dept")?.value,
+    week:     document.getElementById("rp-week")?.value,
+    manager:  document.getElementById("rp-mgr")?.value,
+    source:   document.getElementById("rp-source")?.value,
+    provider,
   });
   typeIn(t, data.text || data.error || "Error generating report");
 };
@@ -1408,10 +1409,15 @@ window.syncLeaveFromExchange = async function (btn) {
 };
 
 window.generateLeaveEmail = async function () {
-  const t = document.getElementById("lv-output");
+  const t        = document.getElementById("lv-output");
+  const controls = document.getElementById("lv-email-controls");
   if (!t) return;
-  t.style.display = "block";
-  t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating leave email...`;
+  t.style.display    = "block";
+  t.textContent      = "";
+  t.setAttribute("contenteditable", "false");
+  t.innerHTML        = `<span class="ldot" style="background:var(--blue)"></span> Generating leave email…`;
+  if (controls) controls.style.display = "none";
+
   const leaveType = document.getElementById("lv-type")?.value || "Planned leave";
   const fromDate  = document.getElementById("lv-from")?.value || "";
   const toDate    = document.getElementById("lv-to")?.value || "";
@@ -1422,14 +1428,25 @@ window.generateLeaveEmail = async function () {
   const prompt = `Write a formal, professional ${leaveType.toLowerCase()} request email from Aditya S (System Analyst / Solution Architect, ESDS Software Solution Pvt. Ltd.)` +
     ` for dates: ${dateRange}.` +
     (reason ? ` Reason: ${reason}.` : "") +
-    ` Include: greeting, leave dates, brief reason, assurance of handover, request for approval, and thank you. Keep it brief and professional. Do not include subject line.`;
-  const data = await api.chat(prompt, "You write formal, courteous workplace emails.");
-  typeIn(t, data.text || data.error);
+    ` To: ${toEmail || "Manager"}.` +
+    ` Include: polite greeting, specific leave dates, brief reason, assurance of work handover, request for approval, and a thank-you close. Do not include a subject line. Use a professional letter format with proper paragraph spacing.`;
+  const data = await api.chat(prompt, "You write formal, courteous workplace emails in proper letter format.");
+  const text = data.text || data.error || "";
+  t.setAttribute("contenteditable", "true");
+  typeIn(t, text);
+  if (controls) controls.style.display = "block";
+};
+
+window.clearLeaveEmail = function () {
+  const t        = document.getElementById("lv-output");
+  const controls = document.getElementById("lv-email-controls");
+  if (t) { t.textContent = ""; t.style.display = "none"; }
+  if (controls) controls.style.display = "none";
 };
 
 window.sendLeaveEmail = async function (btn) {
   const emailText = document.getElementById("lv-output")?.innerText?.trim();
-  if (!emailText || emailText.includes("Generating")) {
+  if (!emailText || emailText.includes("Generating leave email")) {
     showToast("Generate the email first, then send.");
     return;
   }
@@ -1477,23 +1494,105 @@ window.sendLeaveEmail = async function (btn) {
 };
 
 // ── General assistant ──────────────────────────────────────────
+
+function renderMarkdown(text) {
+  let html = escHtml(text);
+  // Code blocks (```...```)
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) =>
+    `<pre style="background:var(--surface2);border-radius:5px;padding:9px 12px;overflow-x:auto;font-family:var(--mono);font-size:12px;margin:8px 0;white-space:pre-wrap">${code.trim()}</pre>`);
+  // Inline code
+  html = html.replace(/`([^`]+)`/g,
+    '<code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:12px">$1</code>');
+  // Bold
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  // H3 / H2 / H1
+  html = html.replace(/^### (.+)$/gm, '<div style="font-size:13px;font-weight:600;color:var(--text);margin:10px 0 3px">$1</div>');
+  html = html.replace(/^## (.+)$/gm,  '<div style="font-size:14px;font-weight:600;color:var(--text);margin:12px 0 4px;border-bottom:1px solid var(--border);padding-bottom:3px">$1</div>');
+  html = html.replace(/^# (.+)$/gm,   '<div style="font-size:15px;font-weight:600;color:var(--text);margin:14px 0 5px">$1</div>');
+  // Numbered list items
+  html = html.replace(/^\d+\.\s+(.+)$/gm, (m) => {
+    const [, num, rest] = m.match(/^(\d+)\.\s+(.+)$/);
+    return `<div style="display:flex;gap:7px;margin:2px 0;align-items:baseline"><span style="color:var(--blue);font-weight:600;flex-shrink:0;min-width:18px">${num}.</span><span>${rest}</span></div>`;
+  });
+  // Bullet list items (- or *)
+  html = html.replace(/^[-*]\s+(.+)$/gm,
+    '<div style="display:flex;gap:7px;margin:2px 0;align-items:baseline"><span style="color:var(--blue);flex-shrink:0">•</span><span>$1</span></div>');
+  // Horizontal rule
+  html = html.replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">');
+  // Paragraph breaks
+  html = html.replace(/\n\n/g, '<div style="height:7px"></div>');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+const CHAT_SUGGESTIONS = [
+  "Write user stories for EEL subscription management",
+  "Write user stories for GPOS billing flow",
+  "Create acceptance criteria for EEL activation",
+  "Create a BRD outline for",
+  "Draft a formal email to Vijay regarding",
+  "Identify risks in the EEL project",
+  "Top 5 risks in GPOS subscription manager",
+  "Create an RTM template for EEL requirements",
+  "Key differences between BRD and FRD",
+  "Write a change request for",
+  "Create a RACI matrix for the EEL project",
+  "Write test cases for EEL onboarding flow",
+  "Summarize key requirements for",
+  "Create a gap analysis for",
+  "Write an executive summary for EEL project",
+  "Define KPIs for the BA team",
+  "Draft meeting agenda for project review",
+  "Create stakeholder register for GPOS",
+  "Write a project charter for",
+  "Identify dependencies in the EEL implementation",
+  "How do I write a good use case?",
+  "What is the difference between functional and non-functional requirements?",
+  "Explain MoSCoW prioritization",
+  "How should I structure a requirements traceability matrix?",
+];
+
+window.chatAutocomplete = function (val) {
+  const box = document.getElementById("chat-suggestions");
+  if (!box) return;
+  const q = val.trim().toLowerCase();
+  if (q.length < 2) { box.style.display = "none"; return; }
+  const matches = CHAT_SUGGESTIONS.filter((s) => s.toLowerCase().includes(q)).slice(0, 6);
+  if (!matches.length) { box.style.display = "none"; return; }
+  box.style.display = "block";
+  box.innerHTML = matches.map((s) =>
+    `<div class="chat-suggest-item" onclick="pickSuggestion(${JSON.stringify(s)})">${escHtml(s)}</div>`
+  ).join("");
+};
+
+window.pickSuggestion = function (text) {
+  const inp = document.getElementById("chat-input");
+  const box = document.getElementById("chat-suggestions");
+  if (inp) inp.value = text;
+  if (box) box.style.display = "none";
+  if (inp) inp.focus();
+};
+
 window.sendChatMessage = async function () {
   const inp = document.getElementById("chat-input");
+  const box = document.getElementById("chat-suggestions");
   const msg = inp?.value?.trim();
   if (!msg) return;
   if (inp) inp.value = "";
+  if (box) box.style.display = "none";
   const msgs = document.getElementById("chat-messages");
   if (!msgs) return;
   msgs.innerHTML += `<div class="chat-msg user"><div class="msg-lbl">You</div>${escHtml(msg)}</div>`;
   const thinking = document.createElement("div");
   thinking.className = "chat-msg ai";
-  thinking.innerHTML = `<div class="msg-lbl">Assistant</div><span class="ldot" style="background:var(--muted)"></span>Thinking...`;
+  thinking.innerHTML = `<div class="msg-lbl">Assistant</div><span class="ldot" style="background:var(--muted)"></span> Thinking…`;
   msgs.appendChild(thinking);
   msgs.scrollTop = msgs.scrollHeight;
   const data = await api.chat(msg);
-  thinking.innerHTML = `<div class="msg-lbl">Assistant</div>${escHtml(data.text || data.error || "Error").replace(/\n/g,"<br>")}`;
+  thinking.innerHTML = `<div class="msg-lbl">Assistant</div>${renderMarkdown(data.text || data.error || "Error")}`;
   msgs.scrollTop = msgs.scrollHeight;
 };
+
 window.quickChat = function (msg) {
   const inp = document.getElementById("chat-input");
   if (inp) inp.value = msg;
@@ -1501,9 +1600,21 @@ window.quickChat = function (msg) {
   const aiNav = document.querySelector('[data-panel="ai"]');
   if (aiNav) window.nav(aiNav);
 };
+
 window.clearChat = function () {
   const msgs = document.getElementById("chat-messages");
   if (msgs) msgs.innerHTML = '<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Chat cleared. How can I help?</div>';
+};
+
+window.setAIProvider = function (provider) {
+  localStorage.setItem("ai_provider", provider);
+  // Sync both selectors
+  ["ai-provider-select", "rp-provider"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = provider;
+  });
+  const labels = { groq: "Groq · LLaMA 3.3 70B", openai: "ChatGPT · GPT-4o", anthropic: "Claude · Sonnet 4.6" };
+  showToast(`AI model: ${labels[provider] || provider}`);
 };
 
 // ── Copy / share helpers (used inline from HTML) ───────────────
@@ -1540,14 +1651,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const badgeEl = document.getElementById("cal-badge");
   if (badgeEl) badgeEl.textContent = (events[todayKey()] || []).length;
 
+  // Restore saved AI provider
+  const savedProvider = localStorage.getItem("ai_provider") || "groq";
+  ["ai-provider-select", "rp-provider"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = savedProvider;
+  });
+
   // Charts (defer so Canvas is ready)
   setTimeout(() => {
-    healthChart = initHealthChart();
     initDocChart();
+    updateDocChart();
+    updateOverviewStats([], null);
   }, 300);
 
-  // Documents
-  renderDocs(window._DOCS || []);  // renderDocs imported at top of documents.js
+  // Documents — register chart refresh hook and load
+  window._refreshDocStats = () => { updateDocChart(); updateOverviewStats(_ewsMeetings, null); };
   filterDocs();
 
   // Restore saved keys
@@ -1591,6 +1710,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.error) return;
       _ewsMeetings = data.meetings || [];
       renderEWSMeetings(_ewsMeetings);
+      updateOverviewStats(_ewsMeetings, null);
+      renderOvUpcoming(_ewsMeetings);
       const syncLbl = document.getElementById("ews-last-sync-lbl");
       if (syncLbl) syncLbl.textContent = "Last synced: " + new Date().toLocaleTimeString("en-IN");
     });
