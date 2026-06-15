@@ -2121,15 +2121,27 @@ function renderStakeholders() {
   tbody.querySelectorAll("tr.lv-member-row").forEach(r => r.remove());
   if (empty) empty.style.display = members.length ? "none" : "";
   members.forEach((m, i) => {
+    const onLeave = m.status === "on-leave";
+    const badge = onLeave
+      ? '<span class="badge b-amber">On Leave</span>'
+      : '<span class="badge b-green">Available</span>';
     const tr = document.createElement("tr");
     tr.className = "lv-member-row";
-    tr.innerHTML = `<td>${i + 1}</td><td style="font-weight:500">${escHtml(m.name)}</td><td>${escHtml(m.role)}</td><td><span class="badge b-green">Available</span></td><td><button class="sm" style="padding:3px 9px;color:var(--red);border-color:var(--red);gap:4px;display:flex;align-items:center" onclick="removeTeamMember(${i})"><i class="ti ti-trash" style="font-size:12px"></i> Delete</button></td>`;
+    tr.dataset.idx = i;
+    tr.innerHTML = '<td>' + (i + 1) + '</td><td style="font-weight:500">' + escHtml(m.name) + '</td><td>' + escHtml(m.role) + '</td><td>' + badge + '</td><td><button class="sm lv-menu-btn" data-mi="' + i + '" onclick="lvToggleMenu(this,' + i + ')" style="padding:2px 10px;font-size:18px;line-height:1;letter-spacing:2px;border-radius:6px;min-width:34px">⋯</button></td>';
     tbody.appendChild(tr);
   });
-  const avail = document.getElementById("lv-avail-count");
-  const total = document.getElementById("lv-total-sub");
-  if (avail) avail.textContent = members.length;
-  if (total) total.textContent = `of ${members.length} member${members.length !== 1 ? "s" : ""}`;
+  const availCount  = members.filter(m => m.status !== "on-leave").length;
+  const leaveCount  = members.filter(m => m.status === "on-leave").length;
+  const leaveNames  = members.filter(m => m.status === "on-leave").map(m => m.name).join(", ") || "—";
+  const availEl     = document.getElementById("lv-avail-count");
+  const totalEl     = document.getElementById("lv-total-sub");
+  const leaveEl     = document.getElementById("lv-leave-count");
+  const leaveNamesEl = document.getElementById("lv-leave-names");
+  if (availEl)     availEl.textContent = availCount;
+  if (totalEl)     totalEl.textContent = `of ${members.length} member${members.length !== 1 ? "s" : ""}`;
+  if (leaveEl)     leaveEl.textContent = leaveCount;
+  if (leaveNamesEl) leaveNamesEl.textContent = leaveNames;
 }
 
 window.addTeamMember = function () {
@@ -2138,7 +2150,7 @@ window.addTeamMember = function () {
   if (!name) { showToast("Enter a name."); return; }
   if (!role) { showToast("Enter a role."); return; }
   const members = lvLoadMembers();
-  members.push({ name, role });
+  members.push({ name, role, status: "available" });
   lvSaveMembers(members);
   document.getElementById("lv-new-name").value = "";
   document.getElementById("lv-new-role").value = "";
@@ -2147,14 +2159,89 @@ window.addTeamMember = function () {
   showToast(`Team member "${name}" added successfully.`);
 };
 
+window.renderStakeholders = renderStakeholders;
+
 window.removeTeamMember = function (i) {
   const members = lvLoadMembers();
   const removed = members[i]?.name || "Member";
   members.splice(i, 1);
   lvSaveMembers(members);
+  lvCloseMenu();
   renderStakeholders();
-  showToast(`"${removed}" removed from team.`);
+  showToast('"' + removed + '" removed from team.');
 };
+
+// ── Singleton action menu (fixed-position, avoids overflow:hidden clipping) ──
+let _lvMenuIdx = -1;
+function lvGetMenuEl() {
+  let el = document.getElementById("lv-action-menu");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "lv-action-menu";
+    el.style.cssText = "display:none;position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);min-width:140px;overflow:hidden";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function lvCloseMenu() {
+  const el = document.getElementById("lv-action-menu");
+  if (el) el.style.display = "none";
+  _lvMenuIdx = -1;
+}
+
+window.lvToggleMenu = function (btn, i) {
+  const menu = lvGetMenuEl();
+  if (_lvMenuIdx === i && menu.style.display !== "none") { lvCloseMenu(); return; }
+  _lvMenuIdx = i;
+  const btnStyle = "width:100%;text-align:left;padding:8px 14px;background:none;border:none;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;";
+  menu.innerHTML =
+    '<button onclick="editTeamMember(' + i + ')" style="' + btnStyle + 'color:var(--text)"><i class="ti ti-pencil"></i> Edit</button>'
+    + '<div style="height:1px;background:var(--border);margin:2px 0"></div>'
+    + '<button onclick="removeTeamMember(' + i + ')" style="' + btnStyle + 'color:var(--red)"><i class="ti ti-trash"></i> Delete</button>';
+  const rect = btn.getBoundingClientRect();
+  menu.style.display = "block";
+  const mw = menu.offsetWidth;
+  let left = rect.right - mw;
+  if (left < 8) left = 8;
+  menu.style.top  = (rect.bottom + 4) + "px";
+  menu.style.left = left + "px";
+  menu.style.right = "auto";
+};
+
+window.editTeamMember = function (i) {
+  lvCloseMenu();
+  const members = lvLoadMembers();
+  const m = members[i];
+  if (!m) return;
+  const tr = document.querySelector("tr.lv-member-row[data-idx='" + i + "']");
+  if (!tr) return;
+  tr.innerHTML =
+    '<td>' + (i + 1) + '</td>'
+    + '<td><input id="lv-edit-name-' + i + '" value="' + escHtml(m.name) + '" style="margin:0;padding:4px 8px;font-size:12px;width:100%"></td>'
+    + '<td><input id="lv-edit-role-' + i + '" value="' + escHtml(m.role) + '" style="margin:0;padding:4px 8px;font-size:12px;width:100%"></td>'
+    + '<td><select id="lv-edit-status-' + i + '" style="margin:0;padding:4px 8px;font-size:12px;width:100%"><option value="available"' + (m.status !== "on-leave" ? " selected" : "") + '>Available</option><option value="on-leave"' + (m.status === "on-leave" ? " selected" : "") + '>On Leave</option></select></td>'
+    + '<td style="display:flex;gap:4px;padding:6px 4px"><button class="sm primary" onclick="saveTeamMember(' + i + ')" style="padding:3px 10px;font-size:12px">Save</button><button class="sm" onclick="window.renderStakeholders()" style="padding:3px 8px;font-size:12px">Cancel</button></td>';
+};
+
+window.saveTeamMember = function (i) {
+  const name   = document.getElementById("lv-edit-name-" + i)?.value?.trim();
+  const role   = document.getElementById("lv-edit-role-" + i)?.value?.trim();
+  const status = document.getElementById("lv-edit-status-" + i)?.value || "available";
+  if (!name) { showToast("Name cannot be empty."); return; }
+  if (!role)  { showToast("Role cannot be empty."); return; }
+  const members = lvLoadMembers();
+  if (!members[i]) return;
+  members[i] = { name, role, status };
+  lvSaveMembers(members);
+  renderStakeholders();
+  showToast(name + " updated.");
+};
+
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".lv-menu-btn") && !e.target.closest("#lv-action-menu")) {
+    lvCloseMenu();
+  }
+});
 
 // set today as default leave dates and load saved emails
 (function initLeaveForm() {
@@ -2278,6 +2365,18 @@ window.sendLeaveEmail = async function (btn) {
 
   if (data.ok) {
     showToast("Leave email sent via Outlook!");
+    // Auto-mark matching team member as On Leave
+    const senderName = document.getElementById("rp-name")?.value?.trim() || "";
+    if (senderName) {
+      const members = lvLoadMembers();
+      const idx = members.findIndex(function (mb) { return mb.name.toLowerCase() === senderName.toLowerCase(); });
+      if (idx !== -1 && members[idx].status !== "on-leave") {
+        members[idx].status = "on-leave";
+        lvSaveMembers(members);
+        renderStakeholders();
+        showToast(members[idx].name + " marked as On Leave in Team Members.");
+      }
+    }
     // Add leave to calendar
     if (fromDate && toDate) {
       const start = new Date(fromDate);
