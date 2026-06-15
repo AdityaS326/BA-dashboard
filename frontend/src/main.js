@@ -14,6 +14,19 @@ let healthChart = null;
 let _tokenTimer      = null;   // proactive expiry warning timer
 let _tokenRefreshing = false;  // prevent concurrent refresh calls
 
+// ── Open Microsoft Teams (desktop app → web fallback) ──────────
+window.openTeamsApp = function () {
+  // Try launching desktop app via protocol link
+  const a = document.createElement("a");
+  a.href = "msteams://";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // After 2s, if desktop app didn't open, open web version in new tab
+  setTimeout(() => window.open("https://teams.cloud.microsoft/", "_blank"), 2000);
+};
+
 // ── Navigate to a panel by key ─────────────────────────────────
 function navTo(panelKey) {
   const navEl = document.querySelector(`[data-panel="${panelKey}"]`);
@@ -127,9 +140,20 @@ window.syncTeamsChats = async function (btn) {
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync chats'; }
 
   if (data.error) {
-    if (noTokEl)  noTokEl.style.display  = "block";
-    if (chatUiEl) chatUiEl.style.display = "none";
-    showToast("Teams chat error: " + data.error);
+    if (data.noPermission) {
+      // Chat.Read scope was missing — show permission banner instead of "no token" card
+      if (noTokEl) {
+        noTokEl.style.display = "block";
+        const msgEl = noTokEl.querySelector(".tc-no-token-msg");
+        if (msgEl) msgEl.textContent = "Chat.Read permission is missing. Sign out and reconnect via Microsoft 365 to get a fresh token with Teams chat access. If it persists, ask your IT admin to grant Chat.Read for this app.";
+      }
+      if (chatUiEl) chatUiEl.style.display = "none";
+      showToast("Teams: Chat.Read permission not granted — reconnect via Microsoft 365.");
+    } else {
+      if (noTokEl)  noTokEl.style.display  = "block";
+      if (chatUiEl) chatUiEl.style.display = "none";
+      showToast("Teams chat error: " + data.error);
+    }
     return;
   }
 
@@ -262,40 +286,24 @@ const PAGE_TITLES = {
 window.nav = function (el) {
   document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
-  const id    = el.dataset.panel;
-  const panel = document.getElementById("p-" + id);
+  const id      = el.dataset.panel;
+  const panel   = document.getElementById("p-" + id);
+  const content = document.getElementById("content");
   if (panel) panel.classList.add("active");
   el.classList.add("active");
   const titleEl = document.getElementById("page-title");
   if (titleEl) titleEl.textContent = PAGE_TITLES[id] || id;
-  // Hide sidebar+topbar on welcome panel; show for all other panels
   const appEl = document.getElementById("app");
   const isLogin = id === "tm" && !ewsGetCreds().ewsUrl;
   if (appEl) appEl.classList.toggle("login-mode", isLogin);
   if (isLogin) { startTmBackground(); } else { stopTmBackground(); }
+
   if (id === "cal") {
     renderCalendar(events);
     renderSchedule(todayKey(), events);
     const creds = ewsGetCreds();
     if (creds.ewsUrl && !_ewsMeetings.length) {
       window.syncOutlookCalendar(document.getElementById("cal-sync-btn"));
-    }
-  }
-  if (id === "tc") {
-    const tok      = localStorage.getItem("spToken") || "";
-    const noTokEl  = document.getElementById("tc-no-token");
-    const chatUiEl = document.getElementById("tc-chat-ui");
-    if (tok) {
-      if (noTokEl)  noTokEl.style.display  = "none";
-      if (chatUiEl && chatUiEl.style.display === "none" && document.getElementById("tc-chat-list")?.children.length <= 1) {
-        // Auto-sync if not yet loaded
-        window.syncTeamsChats(document.getElementById("tc-sync-btn"));
-      } else if (chatUiEl) {
-        chatUiEl.style.display = "block";
-      }
-    } else {
-      if (noTokEl)  noTokEl.style.display  = "block";
-      if (chatUiEl) chatUiEl.style.display = "none";
     }
   }
 };
@@ -680,7 +688,10 @@ function renderICSMeetings(meetings) {
       </div>
       <span class="badge ${isPast ? "b-green" : "b-blue"}">${isPast ? "Past" : "Upcoming"}</span>
       ${isTeams ? '<span class="badge b-blue" style="margin-left:4px">Teams</span>' : ""}`;
-    row.onclick = () => showICSMeetingDetail(m, i, row);
+    row.onclick = () => {
+      const teamsUrl = (m.desc || "").match(/https:\/\/teams\.microsoft\.com\/[^\s<>"]+/)?.[0];
+      if (teamsUrl) { window.open(teamsUrl, "_blank"); } else { showICSMeetingDetail(m, i, row); }
+    };
     list.appendChild(row);
   });
 }
@@ -841,7 +852,9 @@ function renderEWSMeetings(meetings) {
       </div>
       <span class="badge ${isToday ? "b-amber" : "b-green"}" style="flex-shrink:0">${isToday ? "Today" : "Past"}</span>
       ${m.isOnline ? '<span class="badge b-blue" style="margin-left:4px;flex-shrink:0">Teams</span>' : ""}`;
-    row.onclick = () => showEWSMeetingDetail(m, i, row);
+    row.onclick = () => {
+      if (m.joinUrl) { window.open(m.joinUrl, "_blank"); } else { showEWSMeetingDetail(m, i, row); }
+    };
     list.appendChild(row);
   });
 
@@ -1204,7 +1217,9 @@ window.syncTeamsMeetings = async function (btn) {
     const atts  = (m.attendees || []).map((a) => a.emailAddress?.name || a.emailAddress?.address).slice(0, 4).join(", ");
     const row   = document.createElement("div");
     row.className = "meet-row";
-    row.onclick   = () => selectMeeting(row, -1, m);
+    row.onclick   = () => {
+      if (m.onlineMeetingUrl) { window.open(m.onlineMeetingUrl, "_blank"); } else { selectMeeting(row, -1, m); }
+    };
     row.innerHTML = `<div><div class="mr-t">${escHtml(m.subject || "Untitled")}</div><div class="mr-m">${isNaN(start) ? "" : start.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} · ${dur} · ${escHtml(atts)}</div></div><span class="badge b-blue">M365</span>`;
     list.appendChild(row);
   });

@@ -345,91 +345,25 @@
 
 <!-- ██ TEAMS CHAT ████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-tc">
-
-  <!-- Session bar -->
-  <div class="card" style="margin-bottom:14px;padding:11px 16px">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <div style="width:32px;height:32px;background:#6264a7;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <i class="ti ti-brand-teams" style="font-size:17px;color:#fff"></i>
+  <div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 120px)">
+    <div style="text-align:center;max-width:380px">
+      <div style="width:72px;height:72px;background:rgba(98,100,167,.12);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
+        <i class="ti ti-brand-teams" style="font-size:38px;color:#6264a7"></i>
       </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="ews-user-label"></div>
-        <div style="font-size:11px;color:var(--muted)" id="tc-sync-lbl">Teams chats not synced yet</div>
+      <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Microsoft Teams</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6">
+        Click below to open Microsoft Teams.<br>If you have the desktop app it will open automatically.
       </div>
-      <button class="sm primary" id="tc-sync-btn" onclick="syncTeamsChats(this)">
-        <i class="ti ti-refresh"></i> Sync chats
-      </button>
-      <button class="sm" onclick="ewsDisconnect()" title="Sign out from Exchange">
-        <i class="ti ti-logout"></i> Sign out
-      </button>
-    </div>
-  </div>
-
-  <!-- No MS365 token — connect card -->
-  <div id="tc-no-token" class="card" style="margin-bottom:14px">
-    <div style="display:flex;gap:14px;align-items:flex-start">
-      <div style="width:40px;height:40px;background:rgba(98,100,167,.12);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
-        <i class="ti ti-brand-teams" style="font-size:22px;color:#6264a7"></i>
-      </div>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:5px">Connect Microsoft 365 to sync Teams chats</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px">
-          Teams chats require a Microsoft 365 access token with <code style="font-family:var(--mono);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:3px">Chat.Read</code> permission.
-          Get a free token in 2 minutes — no admin approval needed.
-        </div>
-
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-          <button class="primary sm" onclick="window.open('https://developer.microsoft.com/en-us/graph/graph-explorer','_blank')">
-            <i class="ti ti-external-link"></i> Open Graph Explorer
-          </button>
-          <button class="sm" onclick="tcToggleTokenInput()">
-            <i class="ti ti-key"></i> Paste access token
-          </button>
-        </div>
-
-        <div id="tc-token-input-area" style="display:none">
-          <input id="tc-token-input" placeholder="Paste Bearer token from Graph Explorer…"
-            style="font-family:var(--mono);font-size:11px;margin-bottom:6px">
-          <button class="primary sm" onclick="tcSaveToken()"><i class="ti ti-check"></i> Connect &amp; sync</button>
-        </div>
-
-        <!-- Steps -->
-        <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;font-size:11px;color:var(--muted);line-height:1.8;border:1px solid var(--border)">
-          <strong style="color:var(--text)">Quick steps:</strong>
-          1 · Open Graph Explorer → Sign in with your Microsoft account<br>
-          2 · Run: <code style="font-family:var(--mono);background:var(--surface);padding:1px 5px;border-radius:3px">GET https://graph.microsoft.com/v1.0/me/chats</code> — consent to <em>Chat.Read</em><br>
-          3 · Click your avatar → Access Token → Copy → paste it above
-        </div>
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+        <button class="primary" style="width:220px;padding:10px 0;font-size:14px" onclick="openTeamsApp()">
+          <i class="ti ti-brand-teams"></i> Open Microsoft Teams
+        </button>
+        <button style="width:220px;padding:9px 0;font-size:13px;background:transparent;border:1px solid var(--border);border-radius:var(--r);color:var(--muted);cursor:pointer" onclick="window.open('https://teams.cloud.microsoft/','_blank')">
+          <i class="ti ti-external-link"></i> Open in browser tab
+        </button>
       </div>
     </div>
   </div>
-
-  <!-- Chat list + messages (shown after sync) -->
-  <div id="tc-chat-ui" style="display:none" class="g2">
-    <!-- Left: conversation list -->
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-size:14px;font-weight:500;color:var(--text)">Conversations</span>
-        <span class="badge b-blue" id="tc-chat-count" style="display:none">0</span>
-      </div>
-      <div id="tc-chat-list">
-        <div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center">
-          <i class="ti ti-message-dots" style="display:block;font-size:26px;margin-bottom:8px;color:var(--border)"></i>
-          Click "Sync chats" to load your Teams conversations.
-        </div>
-      </div>
-    </div>
-    <!-- Right: messages -->
-    <div>
-      <div id="tc-messages-panel" class="card" style="font-size:13px;color:var(--muted);min-height:220px;display:flex;align-items:center;justify-content:center">
-        <div style="text-align:center">
-          <i class="ti ti-message-2" style="display:block;font-size:28px;margin-bottom:8px;color:var(--border)"></i>
-          Select a conversation to view messages
-        </div>
-      </div>
-    </div>
-  </div>
-
 </div>
 
 <!-- ██ WEEKLY REPORT ███████████████████████████████████████████████████████ -->
