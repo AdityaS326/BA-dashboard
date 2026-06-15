@@ -224,7 +224,7 @@ function buildGetItemSOAP(itemId, changeKey) {
     <m:GetItem>
       <m:ItemShape>
         <t:BaseShape>Default</t:BaseShape>
-        <t:BodyType>Text</t:BodyType>
+        <t:BodyType>HTML</t:BodyType>
       </m:ItemShape>
       <m:ItemIds>
         <t:ItemId Id="${itemId}" ChangeKey="${changeKey}"/>
@@ -324,15 +324,35 @@ const soapBody = buildCreateMeetingSOAP(
   }
 }
 
+function buildGetAttachmentSOAP(attachmentId) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+  xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header><t:RequestServerVersion Version="Exchange2013_SP1"/></soap:Header>
+  <soap:Body>
+    <m:GetAttachment>
+      <m:AttachmentShape/>
+      <m:AttachmentIds>
+        <t:AttachmentId Id="${attachmentId}"/>
+      </m:AttachmentIds>
+    </m:GetAttachment>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
 // POST /api/ews/email-body
 export async function getEmailBody(req, res) {
   const { ewsUrl, username, password, itemId, changeKey } = req.body;
   if (!username || !password || !itemId) return res.status(400).json({ error: "username, password and itemId required." });
-
   if (!ewsUrl) return res.status(400).json({ error: "Exchange server URL is required." });
-  const url  = ewsUrl;
+
+  const url = ewsUrl;
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
+  const ntlmOpts = { url, username: user, password, domain, workstation: "", rejectUnauthorized: false };
 
 const soapBody = buildCreateMeetingSOAP(
     subject,
@@ -349,41 +369,48 @@ const soapBody = buildCreateMeetingSOAP(
 
   try {
     const response = await ntlmPost({
-      url: ewsUrl, username: user, password, domain, workstation: '',
-      body: soapBody,
-      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
-      rejectUnauthorized: false,
+      ...ntlmOpts,
+      body: buildGetItemSOAP(itemId, changeKey),
+      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/GetItem"' },
     });
 
-    console.log('[createMeeting] Exchange HTTP status:', response.statusCode);
+    const bodyMatch = response.body.match(/<t:Body[^>]*>([\s\S]*?)<\/t:Body>/i);
+    const raw = bodyMatch ? bodyMatch[1].trim() : "";
+    let html = raw
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#xD;/g, "").replace(/&#xA;/g, "\n");
 
-    if (response.statusCode === 401) {
-      console.log('[createMeeting] Auth failed - invalid credentials');
-      return res.status(401).json({ error: 'Invalid Exchange credentials. Check your username and password.' });
-    }
-    if (response.statusCode >= 400) {
-      console.log('[createMeeting] Exchange error body:', response.body?.substring(0, 500));
-      return res.status(response.statusCode).json({ error: 'Exchange returned HTTP ' + response.statusCode });
-    }
-    if (response.body.includes('soap:Fault')) {
-      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
-      const detail = fault ? fault[1] : 'Unknown SOAP fault';
-      console.log('[createMeeting] SOAP fault:', detail);
-      return res.status(500).json({ error: 'Exchange error: ' + detail });
-    }
-    if (response.body.includes('ResponseCode')) {
-      const code = response.body.match(/<m:ResponseCode>([^<]+)<\/m:ResponseCode>/i);
-      if (code && code[1] !== 'NoError') {
-        const msg2 = response.body.match(/<m:MessageText>([^<]+)<\/m:MessageText>/i);
-        const detail2 = msg2 ? msg2[1] : code[1];
-        console.log('[createMeeting] EWS ResponseCode error:', detail2);
-        return res.status(500).json({ error: 'Exchange: ' + detail2 });
+    // Parse inline attachments and replace cid: references with data: URLs
+    const cidRefs = [...html.matchAll(/cid:([^\s"'>\)]+)/gi)].map(m => m[1]);
+    if (cidRefs.length > 0) {
+      const attBlocks = response.body.match(/<t:FileAttachment>[\s\S]*?<\/t:FileAttachment>/gi) || [];
+      for (const block of attBlocks) {
+        const attIdMatch  = block.match(/<t:AttachmentId Id="([^"]+)"/i);
+        const contentId   = (block.match(/<t:ContentId>([^<]+)<\/t:ContentId>/i) || [])[1] || "";
+        const contentType = (block.match(/<t:ContentType>([^<]+)<\/t:ContentType>/i) || [])[1] || "image/png";
+        const isInline    = block.includes("<t:IsInline>true</t:IsInline>");
+        if (!attIdMatch || !isInline) continue;
+
+        const cleanCid = contentId.replace(/^<|>$/g, "");
+        const matched  = cidRefs.some(c => c.replace(/^<|>$/g, "") === cleanCid);
+        if (!matched) continue;
+
+        try {
+          const attResp = await ntlmPost({
+            ...ntlmOpts,
+            body: buildGetAttachmentSOAP(attIdMatch[1]),
+            headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/GetAttachment"' },
+          });
+          const b64 = (attResp.body.match(/<t:Content>([^<]+)<\/t:Content>/i) || [])[1] || "";
+          if (b64) {
+            const dataUrl = `data:${contentType};base64,${b64}`;
+            html = html.replace(new RegExp(`cid:${cleanCid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"), dataUrl);
+          }
+        } catch (_) { /* skip failed attachment */ }
       }
     }
 
-    console.log('[createMeeting] Success - invite sent to', (attendees || []).join(', ') || 'organizer only');
-    const sentTo = (attendees || []).filter(Boolean);
-    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate), sentTo, subject });
+    res.json({ body: html, bodyType: "html" });
   } catch (err) {
     const msg = err.message || '';
     console.log('[createMeeting] Exception:', msg);
