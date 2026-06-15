@@ -9,7 +9,9 @@ function msToken() {
   return localStorage.getItem("spToken") || "";
 }
 
-function isExpiredTokenError(status, msg) {
+function isMsTokenError(endpoint, status, msg) {
+  // Only fire ms-token-expired for Graph API calls, NOT for EWS (EWS uses NTLM, not OAuth)
+  if (endpoint.startsWith("/api/ews")) return false;
   return status === 401 || /expired|InvalidAuthenticationToken|token.*invalid/i.test(msg || "");
 }
 
@@ -21,7 +23,7 @@ async function get(endpoint, params = {}) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
       const msg = err.error || `Request failed (${res.status})`;
-      if (isExpiredTokenError(res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
+      if (isMsTokenError(endpoint, res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
       return { error: msg };
     }
     return res.json();
@@ -40,7 +42,7 @@ async function post(endpoint, body) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
       const msg = err.error || `Request failed (${res.status})`;
-      if (isExpiredTokenError(res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
+      if (isMsTokenError(endpoint, res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
       return { error: msg };
     }
     return res.json();
@@ -83,6 +85,13 @@ export const api = {
 
   // Microsoft 365 — Calendar
   msCalendar: () => get("/api/mscalendar/events", { token: msToken() }),
+
+  // SharePoint — list user's recent documents (OneDrive)
+  spFiles:     ()         => get("/api/sharepoint/files",      { token: msToken() }),
+  // SharePoint — list sites the user has access to
+  spSites:     ()         => get("/api/sharepoint/sites",      { token: msToken() }),
+  // SharePoint — list document library files from a specific site
+  spSiteFiles: (siteId)   => get("/api/sharepoint/site-files", { token: msToken(), siteId }),
 
   // Exchange Web Services (on-premise Exchange)
   ewsMeetings:     (creds) => post("/api/ews/meetings",        creds),
