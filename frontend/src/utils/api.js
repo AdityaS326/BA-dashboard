@@ -77,9 +77,10 @@ export const api = {
   teamsChatMessages: (chatId)   => get(`/api/teams/chats/${chatId}/messages`, { token: msToken() }),
 
   // Microsoft 365 — Outlook
-  outlookEmails: ()      => get("/api/outlook/emails", { token: msToken() }),
-  outlookDraft:  (data)  => post("/api/outlook/draft", data),
-  outlookSend:   (data)  => post("/api/outlook/send",  { ...data, token: msToken() }),
+  outlookEmails:    ()    => get("/api/outlook/emails",           { token: msToken() }),
+  outlookEmailBody: (id)  => get(`/api/outlook/emails/${id}/body`, { token: msToken() }),
+  outlookDraft:     (data) => post("/api/outlook/draft", data),
+  outlookSend:      (data) => post("/api/outlook/send", { ...data, token: msToken() }),
 
   // Microsoft 365 — Calendar
   msCalendar: () => get("/api/mscalendar/events", { token: msToken() }),

@@ -218,7 +218,7 @@ function buildGetItemSOAP(itemId, changeKey) {
     <m:GetItem>
       <m:ItemShape>
         <t:BaseShape>Default</t:BaseShape>
-        <t:BodyType>Text</t:BodyType>
+        <t:BodyType>HTML</t:BodyType>
       </m:ItemShape>
       <m:ItemIds>
         <t:ItemId Id="${itemId}" ChangeKey="${changeKey}"/>
@@ -277,42 +277,80 @@ export async function getEmails(req, res) {
   }
 }
 
+function buildGetAttachmentSOAP(attachmentId) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+  xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header><t:RequestServerVersion Version="Exchange2013_SP1"/></soap:Header>
+  <soap:Body>
+    <m:GetAttachment>
+      <m:AttachmentShape/>
+      <m:AttachmentIds>
+        <t:AttachmentId Id="${attachmentId}"/>
+      </m:AttachmentIds>
+    </m:GetAttachment>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
 // POST /api/ews/email-body
 export async function getEmailBody(req, res) {
   const { ewsUrl, username, password, itemId, changeKey } = req.body;
   if (!username || !password || !itemId) return res.status(400).json({ error: "username, password and itemId required." });
-
   if (!ewsUrl) return res.status(400).json({ error: "Exchange server URL is required." });
-  const url  = ewsUrl;
+
+  const url = ewsUrl;
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
+  const ntlmOpts = { url, username: user, password, domain, workstation: "", rejectUnauthorized: false };
 
   try {
     const response = await ntlmPost({
-      url, username: user, password, domain, workstation: "",
+      ...ntlmOpts,
       body: buildGetItemSOAP(itemId, changeKey),
       headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/GetItem"' },
-      rejectUnauthorized: false,
     });
+
     const bodyMatch = response.body.match(/<t:Body[^>]*>([\s\S]*?)<\/t:Body>/i);
-    const raw = bodyMatch ? bodyMatch[1] : "";
-    const bodyText = raw
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/p>/gi, "\n")
-      .replace(/<\/div>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&#xD;/gi, "")
-      .replace(/&#xA;/gi, "\n")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/&quot;/gi, '"')
-      .replace(/&#x27;/gi, "'")
-      .replace(/\r/g, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    res.json({ body: bodyText.slice(0, 3000) });
+    const raw = bodyMatch ? bodyMatch[1].trim() : "";
+    let html = raw
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#xD;/g, "").replace(/&#xA;/g, "\n");
+
+    // Parse inline attachments and replace cid: references with data: URLs
+    const cidRefs = [...html.matchAll(/cid:([^\s"'>\)]+)/gi)].map(m => m[1]);
+    if (cidRefs.length > 0) {
+      const attBlocks = response.body.match(/<t:FileAttachment>[\s\S]*?<\/t:FileAttachment>/gi) || [];
+      for (const block of attBlocks) {
+        const attIdMatch  = block.match(/<t:AttachmentId Id="([^"]+)"/i);
+        const contentId   = (block.match(/<t:ContentId>([^<]+)<\/t:ContentId>/i) || [])[1] || "";
+        const contentType = (block.match(/<t:ContentType>([^<]+)<\/t:ContentType>/i) || [])[1] || "image/png";
+        const isInline    = block.includes("<t:IsInline>true</t:IsInline>");
+        if (!attIdMatch || !isInline) continue;
+
+        const cleanCid = contentId.replace(/^<|>$/g, "");
+        const matched  = cidRefs.some(c => c.replace(/^<|>$/g, "") === cleanCid);
+        if (!matched) continue;
+
+        try {
+          const attResp = await ntlmPost({
+            ...ntlmOpts,
+            body: buildGetAttachmentSOAP(attIdMatch[1]),
+            headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/GetAttachment"' },
+          });
+          const b64 = (attResp.body.match(/<t:Content>([^<]+)<\/t:Content>/i) || [])[1] || "";
+          if (b64) {
+            const dataUrl = `data:${contentType};base64,${b64}`;
+            html = html.replace(new RegExp(`cid:${cleanCid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"), dataUrl);
+          }
+        } catch (_) { /* skip failed attachment */ }
+      }
+    }
+
+    res.json({ body: html, bodyType: "html" });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

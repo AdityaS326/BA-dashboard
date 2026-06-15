@@ -298,6 +298,22 @@ window.nav = function (el) {
   if (appEl) appEl.classList.toggle("login-mode", isLogin);
   if (isLogin) { startTmBackground(); } else { stopTmBackground(); }
 
+  if (id === "tc") {
+    const tok      = localStorage.getItem("spToken") || "";
+    const noTokEl  = document.getElementById("tc-no-token");
+    const chatUiEl = document.getElementById("tc-chat-ui");
+    if (tok) {
+      if (noTokEl) noTokEl.style.display = "none";
+      if (chatUiEl && chatUiEl.style.display === "none" && document.getElementById("tc-chat-list")?.children.length <= 1) {
+        window.syncTeamsChats(document.getElementById("tc-sync-btn"));
+      } else if (chatUiEl) {
+        chatUiEl.style.display = "block";
+      }
+    } else {
+      if (noTokEl)  noTokEl.style.display  = "block";
+      if (chatUiEl) chatUiEl.style.display = "none";
+    }
+  }
   if (id === "cal") {
     renderCalendar(events);
     renderSchedule(todayKey(), events);
@@ -1332,8 +1348,8 @@ async function previewEWSEmail(email, row, creds) {
       <div style="font-size:12px;color:var(--muted)"><strong>From:</strong> ${escHtml(from)}${fromAddress ? " &lt;" + escHtml(fromAddress) + "&gt;" : ""}</div>
       <div style="font-size:12px;color:var(--muted)"><strong>Date:</strong> ${dateStr}</div>
     </div>
-    <div id="ol-body-content" style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;min-height:60px;margin-bottom:12px">
-      <span class="ldot" style="background:var(--blue)"></span> Loading full email...
+    <div id="ol-body-content" style="min-height:60px;margin-bottom:12px;border-radius:var(--r-sm);overflow:hidden">
+      <div style="font-size:12px;color:var(--muted);padding:10px 0"><span class="ldot" style="background:var(--blue)"></span> Loading full email...</div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <button class="sm primary" onclick="startEmailCompose('reply')"><i class="ti ti-arrow-back-up"></i> Reply</button>
@@ -1358,11 +1374,28 @@ async function previewEWSEmail(email, row, creds) {
 
   if (email.id && creds) {
     const bodyData = await api.ewsEmailBody({ ...creds, itemId: email.id, changeKey: email.changeKey });
-    const bodyText = bodyData.body || "(no content)";
     const bodyEl   = document.getElementById("ol-body-content");
-    if (bodyEl) bodyEl.textContent = bodyText;
-    _currentEmail.bodyFull    = bodyText;
-    _currentEmail.bodyPreview = bodyText.slice(0, 500);
+    const content  = bodyData.body || "(no content)";
+    const isHtml   = bodyData.bodyType === "html" || /<[a-z][\s\S]*>/i.test(content);
+    if (bodyEl) {
+      if (isHtml) {
+        const iframe = document.createElement("iframe");
+        iframe.sandbox = "allow-same-origin allow-popups";
+        iframe.style.cssText = "width:100%;border:none;min-height:300px;border-radius:var(--r-sm);background:#fff";
+        iframe.srcdoc = content;
+        iframe.onload = () => {
+          const h = iframe.contentDocument?.body?.scrollHeight;
+          if (h) iframe.style.height = h + 20 + "px";
+        };
+        bodyEl.innerHTML = "";
+        bodyEl.appendChild(iframe);
+      } else {
+        bodyEl.style.cssText = "font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;padding:8px 0;margin-bottom:12px";
+        bodyEl.textContent = content;
+      }
+    }
+    _currentEmail.bodyFull    = content;
+    _currentEmail.bodyPreview = content.replace(/<[^>]+>/g, "").slice(0, 500);
   }
 }
 
@@ -1493,14 +1526,49 @@ window.syncOutlookEmails = async function (btn) {
     list.appendChild(row);
   });
 };
-function previewEmail(email, row) {
+async function previewEmail(email, row) {
   document.querySelectorAll("#ol-list .meet-row").forEach((r) => r.classList.remove("sel"));
   row.classList.add("sel");
   _currentEmail = email;
   const det = document.getElementById("ol-detail");
   if (!det) return;
   const from = email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown";
-  det.innerHTML = `<div style="font-size:14px;font-weight:500;margin-bottom:4px">${escHtml(email.subject || "(no subject)")}</div><div style="font-size:12px;color:var(--muted);margin-bottom:8px">From: ${escHtml(from)} · ${new Date(email.receivedDateTime).toLocaleString("en-IN")}</div><div style="font-size:13px;color:var(--muted);margin-bottom:10px">${escHtml(email.bodyPreview || "")}</div><button class="primary sm" onclick="draftEmailReply()"><i class="ti ti-robot"></i> AI Draft Reply</button>`;
+  det.innerHTML = `
+    <div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px">
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:5px">${escHtml(email.subject || "(no subject)")}</div>
+      <div style="font-size:12px;color:var(--muted)"><strong>From:</strong> ${escHtml(from)}</div>
+      <div style="font-size:12px;color:var(--muted)"><strong>Date:</strong> ${new Date(email.receivedDateTime).toLocaleString("en-IN")}</div>
+    </div>
+    <div id="ol-body-m365" style="min-height:80px;margin-bottom:12px;border-radius:var(--r-sm);overflow:hidden">
+      <div style="font-size:12px;color:var(--muted);padding:8px 0"><span class="ldot" style="background:var(--blue)"></span> Loading...</div>
+    </div>
+    <button class="primary sm" onclick="draftEmailReply()"><i class="ti ti-robot"></i> AI Draft Reply</button>`;
+
+  if (email.id) {
+    const data    = await api.outlookEmailBody(email.id);
+    const content = data.body || email.bodyPreview || "(no content)";
+    const isHtml  = (data.bodyType || "").toLowerCase() === "html" || /<[a-z][\s\S]*>/i.test(content);
+    const bodyEl  = document.getElementById("ol-body-m365");
+    if (bodyEl) {
+      if (isHtml) {
+        const iframe = document.createElement("iframe");
+        iframe.sandbox = "allow-same-origin allow-popups";
+        iframe.style.cssText = "width:100%;border:none;min-height:300px;border-radius:var(--r-sm);background:#fff";
+        iframe.srcdoc = content;
+        iframe.onload = () => {
+          const h = iframe.contentDocument?.body?.scrollHeight;
+          if (h) iframe.style.height = h + 20 + "px";
+        };
+        bodyEl.innerHTML = "";
+        bodyEl.appendChild(iframe);
+      } else {
+        bodyEl.style.cssText = "font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;padding:8px 0";
+        bodyEl.textContent = content;
+      }
+    }
+    _currentEmail.bodyFull    = content;
+    _currentEmail.bodyPreview = content.replace(/<[^>]+>/g, "").slice(0, 500);
+  }
 }
 window.draftEmailReply = async function () {
   if (!_currentEmail) return;
