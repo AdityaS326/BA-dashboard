@@ -56,7 +56,7 @@ app.get("/api/auth/microsoft", (req, res) => {
     return res.status(500).json({ error: "SP_TENANT_ID and SP_CLIENT_ID must be set in .env" });
   const origin      = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${config.port}`;
   const redirectUri = `${origin}/api/sharepoint/callback`;
-  const scope       = "Files.ReadWrite.All Sites.ReadWrite.All User.Read offline_access Calendars.Read Mail.Read Mail.Send";
+  const scope       = "Files.ReadWrite.All Sites.ReadWrite.All User.Read offline_access Calendars.Read Mail.Read Mail.Send Chat.Read ChannelMessage.Read.All";
   res.redirect(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_mode=query`);
 });
 

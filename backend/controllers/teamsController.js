@@ -80,22 +80,35 @@ export async function getMeetings(req, res) {
   }
 }
 
+function isChatPermissionError(status, code) {
+  return status === 403 || code === "Forbidden" || code === "Authorization_RequestDenied";
+}
+
 // GET /api/teams/chats
 export async function getChats(req, res) {
   const token = req.query.token || req.headers["x-ms-token"] || "";
-  if (!token) return res.status(400).json({ error: "No Microsoft 365 token. Connect via Graph Explorer first." });
+  if (!token) return res.status(400).json({ error: "No Microsoft 365 token. Connect via Microsoft 365 first." });
   const auth = { Authorization: bearer(token) };
   try {
     const resp = await fetch(
-      "https://graph.microsoft.com/v1.0/me/chats?$expand=members&$top=30&$orderby=lastUpdatedDateTime desc",
+      "https://graph.microsoft.com/v1.0/me/chats?$expand=members&$top=30",
       { headers: auth }
     );
     if (resp.ok) {
       const data = await resp.json();
       return res.json({ chats: data.value || [] });
     }
-    const err = await resp.json();
-    const msg = err.error?.message || "Graph API error";
+    const err  = await resp.json();
+    const code = err.error?.code || "";
+    const msg  = err.error?.message || "Graph API error";
+
+    if (isChatPermissionError(resp.status, code)) {
+      return res.status(200).json({
+        chats:      [],
+        noPermission: true,
+        error: "Chat.Read permission is not granted for this token. Re-authenticate via Microsoft 365 to get a fresh token with Teams chat access. If the error persists, ask your IT admin to grant Chat.Read consent for this app."
+      });
+    }
     return res.status(resp.status).json({ error: msg });
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -118,8 +131,18 @@ export async function getChatMessages(req, res) {
       const data = await resp.json();
       return res.json({ messages: data.value || [] });
     }
-    const err = await resp.json();
-    return res.status(resp.status).json({ error: err.error?.message || "Graph API error" });
+    const err  = await resp.json();
+    const code = err.error?.code || "";
+    const msg  = err.error?.message || "Graph API error";
+
+    if (isChatPermissionError(resp.status, code)) {
+      return res.status(200).json({
+        messages:     [],
+        noPermission: true,
+        error: "Chat.Read permission is not granted. Re-authenticate via Microsoft 365 to refresh your token with Teams chat access."
+      });
+    }
+    return res.status(resp.status).json({ error: msg });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
