@@ -263,16 +263,19 @@
     <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
       <div style="flex:1;min-width:160px">
         <label>Project name</label>
-        <input id="ov-project" placeholder="e.g. EEL v2, GPOS, Customer Portal…" oninput="updateProjectName(this.value)" style="margin-bottom:0">
+        <input id="ov-project" placeholder="e.g. EEL v2, GPOS, Customer Portal…" style="margin-bottom:0" onkeydown="if(event.key==='Enter') submitProjectSetup()">
       </div>
       <div style="width:240px">
         <label>AI platform</label>
-        <select id="ov-ai-platform" style="margin-bottom:0" onchange="setAIProvider(this.value)">
+        <select id="ov-ai-platform" style="margin-bottom:0">
           <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
           <option value="ollama">🦙 Ollama — Local LLM</option>
           <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
         </select>
       </div>
+      <button class="primary" style="height:36px;padding:0 20px;flex-shrink:0;display:inline-flex;align-items:center;gap:6px" onclick="submitProjectSetup()">
+        <i class="ti ti-check"></i> Submit
+      </button>
     </div>
   </div>
   <!-- Stat cards — all populated dynamically from EWS + DOCS -->

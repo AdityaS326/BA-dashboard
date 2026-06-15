@@ -2088,6 +2088,14 @@ window.updateProjectName = function (val) {
   if (el) { el.textContent = val || ""; el.style.display = val?.trim() ? "block" : "none"; }
 };
 
+window.submitProjectSetup = function () {
+  const val      = document.getElementById("ov-project")?.value?.trim() || "";
+  const provider = document.getElementById("ov-ai-platform")?.value || "groq";
+  window.updateProjectName(val);
+  window.setAIProvider(provider);
+  if (val) showToast(`Project set: ${val}`);
+};
+
 // set today as default for the calendar Add Event date field
 (function() { const el = document.getElementById("ev-date"); if (el && !el.value) el.value = new Date().toISOString().slice(0, 10); })();
 
