@@ -322,17 +322,30 @@ window.nav = function (el) {
       window.syncOutlookCalendar(document.getElementById("cal-sync-btn"));
     }
   }
+
+  if (id === "dc") {
+    window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
+  }
 };
 
 // ── Clock ──────────────────────────────────────────────────────
+function getISOWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return { week: Math.ceil(((date - yearStart) / 86400000 + 1) / 7), year: date.getUTCFullYear() };
+}
+
 function tick() {
   const n = new Date();
-  const clockEl = document.getElementById("clk");
-  const dateEl  = document.getElementById("dt-lbl");
-  const tbTime  = document.getElementById("topbar-time");
-  if (clockEl) clockEl.textContent = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  if (dateEl)  dateEl.textContent  = n.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  if (tbTime)  tbTime.textContent  = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  const clockEl   = document.getElementById("clk");
+  const dateEl    = document.getElementById("dt-lbl");
+  const tbTime    = document.getElementById("topbar-time");
+  const tbWeekEl  = document.getElementById("topbar-week");
+  if (clockEl)  clockEl.textContent  = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (dateEl)   dateEl.textContent   = n.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  if (tbTime)   tbTime.textContent   = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  if (tbWeekEl) { const { week, year } = getISOWeek(n); tbWeekEl.textContent = `Wk ${week} · ${year}`; }
   checkAndShowReminder(events);
 }
 setInterval(tick, 1000);
@@ -350,7 +363,14 @@ window.addEvent = async () => {
 
   // 2 — send Outlook invite via Exchange if connected
   const creds = ewsGetCreds();
-  if (!creds.ewsUrl) return; // not connected — local only
+  const statusEl = document.getElementById("ev-invite-status");
+  const btn      = document.getElementById("ev-add-btn");
+
+  if (!creds.ewsUrl) {
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "rgba(220,150,0,.1)"; statusEl.style.color = "var(--orange,#d97706)"; statusEl.textContent = "⚠ Not connected to Exchange — event saved locally only. Connect in the Teams panel to send invites."; }
+    setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 6000);
+    return;
+  }
 
   const title    = document.getElementById("ev-title")?.value?.trim();
   const date     = document.getElementById("ev-date")?.value || new Date().toISOString().slice(0, 10);
@@ -358,13 +378,16 @@ window.addEvent = async () => {
   const dur      = document.getElementById("ev-dur")?.value;
   const attRaw   = document.getElementById("ev-att")?.value?.trim();
   const location = document.getElementById("ev-location")?.value?.trim();
+  const desc     = document.getElementById("ev-desc")?.value?.trim();
 
-  if (!title) return;
+  if (!title) {
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ Please enter a meeting subject."; }
+    setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 4000);
+    return;
+  }
   const attendees = attRaw ? attRaw.split(/[,;]+/).map(a => a.trim()).filter(a => a.includes("@")) : [];
 
-  const statusEl = document.getElementById("ev-invite-status");
-  const btn      = document.getElementById("ev-add-btn");
-  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending invite via Outlook…"; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending invite via Exchange…"; }
   if (btn) btn.disabled = true;
 
   const data = await api.ewsCreateMeeting({
@@ -375,16 +398,21 @@ window.addEvent = async () => {
     duration:  dur,
     attendees,
     location,
+    body:      desc,
   });
 
   if (btn) btn.disabled = false;
   if (data.ok) {
-    if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ Invite sent to ${attendees.length ? attendees.join(", ") : "your calendar"} via Outlook.`; }
-    showToast("Meeting invite sent via Outlook!");
+    const sent = (data.sentTo && data.sentTo.length) ? data.sentTo : attendees;
+    const recipientMsg = sent.length ? `Invite sent to: ${sent.join(", ")}` : "Saved to your calendar";
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ ${recipientMsg}`; }
+    showToast(`Meeting "${title}" created & invite sent via Exchange!`);
+    const descEl = document.getElementById("ev-desc");    if (descEl) descEl.value = "";
+    const locEl  = document.getElementById("ev-location"); if (locEl) locEl.value = "";
   } else {
-    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error}`; }
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error}`; }
   }
-  setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 5000);
+  setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 6000);
 };
 
 // ── Overview charts ────────────────────────────────────────────
@@ -457,6 +485,162 @@ window.uploadDocFromForm = async function (btn) {
   if (lbl) lbl.textContent = "Choose file (.pdf / .docx)";
   if (statusEl) statusEl.textContent = `Uploaded: ${data.name} → ${path}`;
   showToast(`Uploaded: ${data.name}`);
+};
+
+// ── SharePoint source toggle (recent vs by-site) ──────────────────
+let _spSource = "recent";
+
+window.spSetSource = function (src, btn) {
+  _spSource = src;
+  const recentBtn = document.getElementById("sp-src-recent");
+  const siteBtn   = document.getElementById("sp-src-site");
+  const siteRow   = document.getElementById("sp-site-row");
+  if (recentBtn) { recentBtn.style.background = src === "recent" ? "var(--blue)" : "var(--surface2)"; recentBtn.style.color = src === "recent" ? "#fff" : "var(--muted)"; }
+  if (siteBtn)   { siteBtn.style.background   = src === "site"   ? "var(--blue)" : "var(--surface2)"; siteBtn.style.color   = src === "site"   ? "#fff" : "var(--muted)"; }
+  if (siteRow)   { siteRow.style.display = src === "site" ? "flex" : "none"; }
+  if (src === "site") {
+    const sel = document.getElementById("sp-site-select");
+    if (sel && sel.options.length <= 1) window.loadSpSites(null);
+  }
+};
+
+window.loadSpSites = async function (btn) {
+  const sel      = document.getElementById("sp-site-select");
+  const statusEl = document.getElementById("sp-sync-status");
+  if (!localStorage.getItem("spToken")) {
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.style.background = "var(--surface2)";
+      statusEl.style.color = "var(--text)";
+      statusEl.innerHTML =
+        '<div style="margin-bottom:8px;font-size:13px;font-weight:500"><i class="ti ti-brand-office" style="color:#0078d4"></i> Connect Microsoft 365 to load SharePoint sites</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.6">Go to <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color:var(--blue)">Graph Explorer</a>, sign in with your Microsoft 365 account, then copy the <strong>Access token</strong> from the Auth tab.</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<input id="sp-inline-token" type="password" placeholder="Paste Microsoft 365 access token…" style="flex:1;min-width:200px;margin:0;font-size:12px;font-family:var(--mono)">' +
+        '<button class="sm primary" onclick="spConnectInline()"><i class="ti ti-plug"></i> Connect &amp; Load</button>' +
+        '</div>';
+    }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i>'; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Loading SharePoint sites…"; }
+  const data = await api.spSites();
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Load sites'; }
+  if (data.error) {
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = "Sites error: " + data.error; }
+    showToast("Sites error: " + data.error);
+    return;
+  }
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select a site —</option>';
+  (data.sites || []).forEach(function (s) {
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.name; sel.appendChild(opt);
+  });
+  const src = data.source === "root" ? " (root only — add Sites.Read.All for full list)" : data.source === "followed" ? " (followed sites)" : "";
+  const msg = "Loaded " + (data.sites || []).length + " site(s)" + src;
+  if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green-text)"; statusEl.textContent = msg; }
+  showToast(msg);
+};
+
+window.spOnSiteChange = function () {
+  const siteId = document.getElementById("sp-site-select")?.value;
+  if (siteId) window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
+};
+
+// ── Connect M365 token inline from Documents panel ────────────────
+window.spConnectInline = function () {
+  const inp = document.getElementById("sp-inline-token");
+  const val = inp ? inp.value.trim() : "";
+  if (!val) { showToast("Paste your Microsoft 365 token first."); return; }
+  localStorage.setItem("spToken", val);
+  updateTokenUI();
+  if (typeof scheduleTokenRefreshTimer === "function") scheduleTokenRefreshTimer(val);
+  showToast("Microsoft 365 connected.");
+  const statusEl = document.getElementById("sp-sync-status");
+  if (statusEl) statusEl.innerHTML = "";
+  // If in site mode, load sites; otherwise sync recent files
+  if (_spSource === "site") {
+    window.loadSpSites(document.getElementById("sp-sync-btn"));
+  } else {
+    window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
+  }
+};
+
+// ── Sync documents from SharePoint (Microsoft Graph API) ──────────
+window.syncSharePointDocs = async function (btn) {
+  const token = localStorage.getItem("spToken") || "";
+  const statusEl = document.getElementById("sp-sync-status");
+  const userEl   = document.getElementById("sp-sync-user");
+
+  if (!token) {
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.style.background = "var(--surface2)";
+      statusEl.style.color = "var(--text)";
+      statusEl.innerHTML =
+        '<div style="margin-bottom:10px;font-size:13px;font-weight:500"><i class="ti ti-brand-office" style="color:#0078d4"></i> Connect Microsoft 365 to fetch your SharePoint documents</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">Get a token from <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color:var(--blue)">Graph Explorer</a> → sign in → copy the <strong>Access token</strong> tab.</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<input id="sp-inline-token" type="password" placeholder="Paste Microsoft 365 access token here…" style="flex:1;min-width:200px;margin:0;font-size:12px;font-family:var(--mono)">' +
+        '<button class="sm primary" onclick="spConnectInline()"><i class="ti ti-plug"></i> Connect</button>' +
+        '</div>';
+    }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Syncing…'; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Fetching files from SharePoint…"; }
+
+  // Branch: recent files (OneDrive) OR site document libraries
+  let data;
+  if (_spSource === "site") {
+    const siteId = document.getElementById("sp-site-select")?.value;
+    if (!siteId) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync'; }
+      if (statusEl) { statusEl.textContent = "Select a site first."; }
+      return;
+    }
+    if (statusEl) statusEl.textContent = "Fetching document libraries from site…";
+    data = await api.spSiteFiles(siteId);
+  } else {
+    data = await api.spFiles();
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync'; }
+
+  if (data.error) {
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = data.error; }
+    return;
+  }
+
+  const spFiles = data.files || [];
+  const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const existingSpIds = new Set(DOCS.filter(function(d) { return d._spId; }).map(function(d) { return d._spId; }));
+  let added = 0, updated = 0;
+
+  spFiles.forEach(function(f) {
+    const modified = f.modified ? new Date(f.modified).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : today;
+    const extMatch = f.name.match(/\.(\w+)$/);
+    const ext = extMatch ? extMatch[1].toLowerCase() : "";
+    const status = (ext === "pdf" || ext === "docx" || ext === "doc") ? "Approved" : "Pending";
+    if (existingSpIds.has(f.id)) {
+      const idx = DOCS.findIndex(function(d) { return d._spId === f.id; });
+      if (idx >= 0) { DOCS[idx].d = modified; DOCS[idx].url = f.webUrl; updated++; }
+    } else {
+      DOCS.unshift({ n: f.name, v: "v1.0", s: status, d: modified, desc: "SharePoint — " + f.folder, url: f.webUrl, _spId: f.id });
+      added++;
+    }
+  });
+
+  try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
+  filterDocs();
+
+  const srcLabel = _spSource === "site" ? ("site (" + (data.libCount || 0) + " libraries)") : "OneDrive recent";
+  const msg = "Synced " + spFiles.length + " file(s) from " + srcLabel + " — " + added + " new, " + updated + " updated.";
+  if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green-text)"; statusEl.textContent = msg; }
+  if (userEl)   { const uname = localStorage.getItem("ewsUsername") || ""; if (uname) userEl.textContent = uname; }
+  showToast(msg);
 };
 
 // Upload via SharePoint (legacy — called from documents.js row menu)
@@ -803,6 +987,29 @@ function ewsGetCreds() {
     password: localStorage.getItem("ewsPassword") || "",
   };
 }
+function extractFirstName(username) {
+  const local = username.includes("@") ? username.split("@")[0] : username;
+  const first = local.split(/[.\-_]/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+window.updateWelcomeMessage = function () {
+  const firstName = localStorage.getItem("firstName") || "";
+  const el = document.getElementById("tb-welcome");
+  if (!el) return;
+  if (firstName) { el.textContent = `Welcome, ${firstName}`; el.style.display = "block"; }
+  else { el.style.display = "none"; }
+};
+
+function showOvMain() {
+  const el = document.getElementById("ov-main-content");
+  if (el) el.style.display = "block";
+  const prompt = document.getElementById("ov-setup-prompt");
+  if (prompt) prompt.style.display = "none";
+  const hint = document.getElementById("ov-setup-hint");
+  if (hint) hint.style.display = "none";
+}
+
 function ewsRestoreUI() {
   const { ewsUrl, username } = ewsGetCreds();
   const setupEl     = document.getElementById("ews-setup-form");
@@ -1069,6 +1276,12 @@ window.ewsConnect = async function (btn) {
   }
 
   ewsSaveCreds(url, username, password);
+
+  // Save first name for welcome message
+  const firstName = extractFirstName(username);
+  localStorage.setItem("firstName", firstName);
+  window.updateWelcomeMessage();
+
   // Remove login-mode so sidebar + topbar reappear
   document.getElementById("app")?.classList.remove("login-mode");
   stopTmBackground();
@@ -1081,8 +1294,11 @@ window.ewsConnect = async function (btn) {
 
   showToast(`Connected! Loaded ${_ewsMeetings.length} meeting(s).`);
 
-  // Redirect to Dashboard after successful connection
+  // Redirect to Dashboard — show full content only if project already set
   navTo("ov");
+  if (localStorage.getItem("projectName")) {
+    showOvMain();
+  }
 };
 
 window.ewsSync = async function (btn) {
@@ -1117,6 +1333,18 @@ window.ewsDisconnect = function () {
   const countEl = document.getElementById("meetings-count");
   if (countEl) countEl.style.display = "none";
   document.getElementById("app")?.classList.add("login-mode");
+  // Clear welcome + reset setup state for next login
+  localStorage.removeItem("firstName");
+  localStorage.removeItem("projectName");
+  window.updateWelcomeMessage();
+  const ovMain = document.getElementById("ov-main-content");
+  if (ovMain) ovMain.style.display = "none";
+  const ovPrompt = document.getElementById("ov-setup-prompt");
+  if (ovPrompt) ovPrompt.style.display = "flex";
+  const sbProj = document.getElementById("sb-project-name");
+  if (sbProj) { sbProj.textContent = ""; sbProj.style.display = "none"; }
+  const projInp = document.getElementById("ov-project");
+  if (projInp) projInp.value = "";
   ewsRestoreUI();
   navTo("tm");
   startTmBackground();
@@ -1425,28 +1653,61 @@ window.startEmailCompose = function (type) {
   toEl.focus();
 };
 
+window.showOlCompose = function () {
+  const area = document.getElementById("ol-compose-area");
+  if (!area) return;
+  area.style.display = "block";
+  document.getElementById("ol-compose-to")?.focus();
+};
+
+window.aiDraftCompose = async function () {
+  const subject = document.getElementById("ol-compose-subject")?.value?.trim();
+  const to      = document.getElementById("ol-compose-to")?.value?.trim();
+  const bodyEl  = document.getElementById("ol-compose-body");
+  if (!subject) { showToast("Enter a subject first so the AI can draft the email."); return; }
+  if (bodyEl) bodyEl.value = "Drafting…";
+  const data = await api.chat(`Write a professional email with subject: "${subject}"${to ? " to " + to : ""}. Include a greeting, clear body, and professional closing. Do not include subject line in the body.`, "You write concise professional workplace emails.");
+  if (bodyEl) bodyEl.value = data.text || data.error || "";
+};
+
 window.sendComposedEmail = async function (btn) {
   const to      = document.getElementById("ol-compose-to")?.value?.trim();
+  const cc      = document.getElementById("ol-compose-cc")?.value?.trim();
   const subject = document.getElementById("ol-compose-subject")?.value?.trim();
   const body    = document.getElementById("ol-compose-body")?.value?.trim();
+  const statusEl = document.getElementById("ol-compose-status");
+
   if (!to)      { showToast("Enter a recipient email."); return; }
   if (!subject) { showToast("Enter a subject."); return; }
+  if (!body)    { showToast("Message body is empty."); return; }
 
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Sending...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Sending…'; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending via Exchange…"; }
 
   const creds = ewsGetCreds();
-  const data  = creds.ewsUrl
-    ? await api.ewsSendEmail({ ...creds, to, subject, body })
-    : await api.outlookSend({ to, subject, body });
+  if (!creds.ewsUrl) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Send Email'; }
+    if (statusEl) { statusEl.style.background = "rgba(220,150,0,.1)"; statusEl.style.color = "var(--orange,#d97706)"; statusEl.textContent = "⚠ Not connected to Exchange. Connect in the Teams panel first."; }
+    return;
+  }
 
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Send'; }
+  const data = await api.ewsSendEmail({ ...creds, to, cc, subject, body });
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Send Email'; }
 
   if (data.ok) {
-    showToast("Email sent!");
-    const area = document.getElementById("ol-compose-area");
-    if (area) area.style.display = "none";
+    if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ Email sent to ${to}`; }
+    showToast(`Email sent to ${to}!`);
+    setTimeout(() => {
+      document.getElementById("ol-compose-to").value      = "";
+      document.getElementById("ol-compose-cc").value      = "";
+      document.getElementById("ol-compose-subject").value = "";
+      document.getElementById("ol-compose-body").value    = "";
+      if (statusEl) statusEl.style.display = "none";
+    }, 2000);
   } else {
-    showToast("Send failed: " + (data.error || "Unknown error"));
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error || "Send failed"}`; }
+    showToast("Send failed: " + (data.error || "Unknown error"), 5000);
   }
 };
 
@@ -1588,11 +1849,14 @@ window.sendOutlookDraft = async function () {
   if (!_currentEmail) return;
   const txt = document.getElementById("ol-draft-text")?.innerText || "";
   if (!txt) { showToast("Draft is empty."); return; }
-  const to = _currentEmail.from?.emailAddress?.address  // M365
-           || _currentEmail.from?.address;              // EWS
+  const to = _currentEmail.from?.emailAddress?.address || _currentEmail.from?.address;
   if (!to) { showToast("Cannot determine reply-to address."); return; }
-  const data = await api.outlookSend({ to, subject: "Re: " + (_currentEmail.subject || ""), body: txt });
-  showToast(data.ok ? "Email sent!" : "Send failed: " + data.error);
+  const subject = "Re: " + (_currentEmail.subject || "");
+  const creds = ewsGetCreds();
+  const data = creds.ewsUrl
+    ? await api.ewsSendEmail({ ...creds, to, subject, body: txt })
+    : await api.outlookSend({ to, subject, body: txt });
+  showToast(data.ok ? `Reply sent to ${to}!` : "Send failed: " + data.error);
 };
 window.sendViaTeams = function () {
   if (!_currentEmail) return;
@@ -1854,16 +2118,14 @@ function renderStakeholders() {
   const empty  = document.getElementById("lv-empty-row");
   if (!tbody) return;
   const members = lvLoadMembers();
-  // remove all dynamic rows
   tbody.querySelectorAll("tr.lv-member-row").forEach(r => r.remove());
   if (empty) empty.style.display = members.length ? "none" : "";
   members.forEach((m, i) => {
     const tr = document.createElement("tr");
     tr.className = "lv-member-row";
-    tr.innerHTML = `<td>${i + 1}</td><td>${escHtml(m.name)}</td><td>${escHtml(m.role)}</td><td><span class="badge b-blue">${escHtml(m.type)}</span></td><td><span class="badge b-green">Available</span></td><td><button class="sm" style="padding:2px 7px" onclick="removeTeamMember(${i})"><i class="ti ti-x" style="font-size:11px"></i></button></td>`;
+    tr.innerHTML = `<td>${i + 1}</td><td style="font-weight:500">${escHtml(m.name)}</td><td>${escHtml(m.role)}</td><td><span class="badge b-green">Available</span></td><td><button class="sm" style="padding:3px 9px;color:var(--red);border-color:var(--red);gap:4px;display:flex;align-items:center" onclick="removeTeamMember(${i})"><i class="ti ti-trash" style="font-size:12px"></i> Delete</button></td>`;
     tbody.appendChild(tr);
   });
-  // update stat cards
   const avail = document.getElementById("lv-avail-count");
   const total = document.getElementById("lv-total-sub");
   if (avail) avail.textContent = members.length;
@@ -1873,21 +2135,25 @@ function renderStakeholders() {
 window.addTeamMember = function () {
   const name = document.getElementById("lv-new-name")?.value?.trim();
   const role = document.getElementById("lv-new-role")?.value?.trim();
-  const type = document.getElementById("lv-new-type")?.value || "Full Time";
   if (!name) { showToast("Enter a name."); return; }
+  if (!role) { showToast("Enter a role."); return; }
   const members = lvLoadMembers();
-  members.push({ name, role: role || "—", type });
+  members.push({ name, role });
   lvSaveMembers(members);
   document.getElementById("lv-new-name").value = "";
   document.getElementById("lv-new-role").value = "";
+  document.getElementById("lv-new-name").focus();
   renderStakeholders();
+  showToast(`Team member "${name}" added successfully.`);
 };
 
 window.removeTeamMember = function (i) {
   const members = lvLoadMembers();
+  const removed = members[i]?.name || "Member";
   members.splice(i, 1);
   lvSaveMembers(members);
   renderStakeholders();
+  showToast(`"${removed}" removed from team.`);
 };
 
 // set today as default leave dates and load saved emails
@@ -2171,8 +2437,53 @@ window.updateProjectName = function (val) {
   if (el) { el.textContent = val || ""; el.style.display = val?.trim() ? "block" : "none"; }
 };
 
+window.submitProjectSetup = function () {
+  const val      = document.getElementById("ov-project")?.value?.trim() || "";
+  const provider = document.getElementById("ov-ai-platform")?.value || "groq";
+  const errEl    = document.getElementById("ov-project-err");
+
+  if (!val) {
+    if (errEl) { errEl.textContent = "Project name is required."; errEl.style.display = "block"; }
+    const inp = document.getElementById("ov-project");
+    if (inp) { inp.style.border = "1.5px solid var(--red)"; inp.focus(); }
+    return;
+  }
+  if (errEl) errEl.style.display = "none";
+  const inp = document.getElementById("ov-project");
+  if (inp) inp.style.border = "";
+
+  window.updateProjectName(val);
+  window.setAIProvider(provider);
+  showOvMain();
+  showToast(`Project "${val}" saved — AI: ${provider}`);
+};
+
 // set today as default for the calendar Add Event date field
 (function() { const el = document.getElementById("ev-date"); if (el && !el.value) el.value = new Date().toISOString().slice(0, 10); })();
+
+// ── Populate Weekly Report reporter fields from login ──────────
+(function initReportFields() {
+  const nameEl = document.getElementById("rp-name");
+  const deptEl = document.getElementById("rp-dept");
+  if (nameEl) {
+    // Prefer saved full name, fall back to firstName from EWS login
+    const savedName = localStorage.getItem("rp_name") || "";
+    const firstName = localStorage.getItem("firstName") || "";
+    const ewsUser   = localStorage.getItem("ewsUsername") || "";
+    // Build display name from EWS username if no saved name: "domain\mahesh.beesu" → "Mahesh Beesu"
+    let derivedName = "";
+    if (ewsUser) {
+      const u = ewsUser.includes("\\") ? ewsUser.split("\\")[1] : ewsUser;
+      derivedName = u.split(/[.\-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
+    }
+    nameEl.value = savedName || derivedName || firstName;
+    nameEl.addEventListener("change", () => localStorage.setItem("rp_name", nameEl.value));
+  }
+  if (deptEl) {
+    deptEl.value = localStorage.getItem("rp_dept") || "";
+    deptEl.addEventListener("change", () => localStorage.setItem("rp_dept", deptEl.value));
+  }
+})();
 
 // ── Restore project name + AI provider on load ─────────────────
 (function initProjectSetup() {
@@ -2182,7 +2493,7 @@ window.updateProjectName = function (val) {
   const aiSel    = document.getElementById("ov-ai-platform");
   if (projInp) projInp.value = project;
   if (aiSel)   aiSel.value   = provider;
-  if (project) window.updateProjectName(project);
+  if (project) { window.updateProjectName(project); showOvMain(); }
 })();
 
 // ── Copy / share helpers (used inline from HTML) ───────────────
@@ -2267,6 +2578,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ewsCreds = ewsGetCreds();
   const { ewsUrl, username, password } = ewsCreds;
   ewsRestoreUI();
+  window.updateWelcomeMessage();
   if (ewsUrl && username && password) {
     // Already connected — remove login-mode, show sidebar, go to Dashboard
     document.getElementById("app")?.classList.remove("login-mode");

@@ -120,8 +120,10 @@ export function addEvent(events) {
   updated[selectedDay] = [...updated[selectedDay], { title, time, type, att, dur, h, m: mi }]
     .sort((a, b) => a.h * 60 + a.m - (b.h * 60 + b.m));
 
-  if (document.getElementById("ev-title")) document.getElementById("ev-title").value = "";
-  if (document.getElementById("ev-att"))   document.getElementById("ev-att").value   = "";
+  if (document.getElementById("ev-title"))    document.getElementById("ev-title").value    = "";
+  if (document.getElementById("ev-att"))      document.getElementById("ev-att").value      = "";
+  if (document.getElementById("ev-desc"))     document.getElementById("ev-desc").value     = "";
+  if (document.getElementById("ev-location")) document.getElementById("ev-location").value = "";
 
   showToast("Event added to calendar.");
   return updated;

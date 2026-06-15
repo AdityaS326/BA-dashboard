@@ -2,7 +2,7 @@
 import { config } from "../config/index.js";
 import { buildReportDocx } from "../utils/docxBuilder.js";
 
-// â”€â”€ Test Graph API connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Test Graph API connection â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 export async function testConnection(req, res) {
   const { token } = req.body;
   if (!token) return res.status(400).json({ ok: false, error: "No access token provided." });
@@ -31,7 +31,7 @@ export async function testConnection(req, res) {
   });
 }
 
-// â”€â”€ Export report as .docx â†’ upload to SharePoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Export report as .docx â†' upload to SharePoint â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 export async function exportReport(req, res) {
   const {
     token,
@@ -93,7 +93,133 @@ export async function exportReport(req, res) {
   res.json({ ok: true, fileId: ud.id, webUrl: ud.webUrl, path: (ud.parentReference?.path || "") + "/" + filename });
 }
 
-// â”€â”€ OAuth callback â€” exchange code for token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+// â"€â"€ OAuth callback â€" exchange code for token â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+export async function listFiles(req, res) {
+  let tok = req.query.token;
+  if (!tok) tok = req.headers.authorization;
+  if (!tok && req.body) tok = req.body.token;
+  if (!tok) return res.status(400).json({ error: 'No access token.' });
+  tok = String(tok).replace(/^Bearer\s+/i, '').trim();
+  if (!tok) return res.status(400).json({ error: 'No access token.' });
+  const bearer = 'Bearer ' + tok;
+  const url = 'https://graph.microsoft.com/v1.0/me/drive/recent?$select=id,name,size,lastModifiedDateTime,webUrl,file,parentReference&$top=100';
+  try {
+    const r = await fetch(url, { headers: { Authorization: bearer } });
+    if (!r.ok) {
+      const e = await r.json().catch(function() { return {}; });
+      return res.json({ error: (e.error && e.error.message) || ('Graph error ' + r.status) });
+    }
+    const data = await r.json();
+    const docExts = /\.(pdf|doc|docx|xlsx|xls|pptx|ppt|txt|md|csv|odt|rtf)$/i;
+    const items = data.value || [];
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+      const f = items[i];
+      if (!f.file || !docExts.test(f.name)) continue;
+      const ref = f.parentReference || {};
+      files.push({ id: f.id, name: f.name, size: f.size, modified: f.lastModifiedDateTime, webUrl: f.webUrl, folder: ref.name || '', path: ref.path || '' });
+    }
+    return res.json({ files: files });
+  } catch (err) {
+    return res.status(502).json({ error: err.message });
+  }
+}
+
+export async function listSites(req, res) {
+  let tok = req.query.token;
+  if (!tok) tok = req.headers.authorization;
+  if (!tok) return res.status(400).json({ error: 'No access token.' });
+  tok = String(tok).replace(/^Bearer\s+/i, '').trim();
+  const bearer = 'Bearer ' + tok;
+  const graph = 'https://graph.microsoft.com/v1.0';
+
+  function normSites(arr) {
+    return arr.map(function(s) { return { id: s.id, name: s.displayName || s.name || s.webUrl, webUrl: s.webUrl }; });
+  }
+
+  try {
+    // Attempt 1: search all sites (requires Sites.Read.All)
+    const r1 = await fetch(graph + '/sites?search=*&$select=id,displayName,webUrl,name&$top=50', { headers: { Authorization: bearer } });
+    if (r1.ok) {
+      const d1 = await r1.json();
+      if (d1.value && d1.value.length > 0) return res.json({ sites: normSites(d1.value), source: 'search' });
+    }
+
+    // Attempt 2: followed sites (no admin consent needed)
+    const r2 = await fetch(graph + '/me/followedSites?$select=id,displayName,webUrl,name&$top=50', { headers: { Authorization: bearer } });
+    if (r2.ok) {
+      const d2 = await r2.json();
+      if (d2.value && d2.value.length > 0) return res.json({ sites: normSites(d2.value), source: 'followed' });
+    }
+
+    // Attempt 3: root SharePoint site only
+    const r3 = await fetch(graph + '/sites/root?$select=id,displayName,webUrl,name', { headers: { Authorization: bearer } });
+    if (r3.ok) {
+      const d3 = await r3.json();
+      return res.json({ sites: [{ id: d3.id, name: d3.displayName || 'Root site', webUrl: d3.webUrl }], source: 'root' });
+    }
+
+    const eBody = await r3.json().catch(function() { return {}; });
+    return res.json({ error: (eBody.error && eBody.error.message) || 'Could not load sites. Check token permissions (Sites.Read.All or Sites.ReadWrite.All).' });
+  } catch (err) {
+    return res.status(502).json({ error: err.message });
+  }
+}
+
+export async function listSiteFiles(req, res) {
+  let tok = req.query.token;
+  if (!tok) tok = req.headers.authorization;
+  if (!tok) return res.status(400).json({ error: 'No access token.' });
+  tok = String(tok).replace(/^Bearer\s+/i, '').trim();
+  const siteId = req.query.siteId;
+  if (!siteId) return res.status(400).json({ error: 'siteId is required.' });
+  const bearer = 'Bearer ' + tok;
+  const graph = 'https://graph.microsoft.com/v1.0';
+  try {
+    // Step 1: get all lists in the site
+    const listsUrl = graph + '/sites/' + siteId + '/lists?$select=id,displayName,list&$top=50';
+    const lr = await fetch(listsUrl, { headers: { Authorization: bearer } });
+    if (!lr.ok) {
+      const e = await lr.json().catch(function() { return {}; });
+      return res.json({ error: (e.error && e.error.message) || ('Lists error ' + lr.status) });
+    }
+    const listsData = await lr.json();
+    // Keep only document libraries (template = documentLibrary)
+    const docLibs = (listsData.value || []).filter(function(l) {
+      return l.list && l.list.template === 'documentLibrary';
+    });
+
+    // Step 2: for each doc library, fetch items with driveItem expanded
+    const docExts = /\.(pdf|doc|docx|xlsx|xls|pptx|ppt|txt|md|csv|odt|rtf)$/i;
+    const files = [];
+    for (let i = 0; i < docLibs.length; i++) {
+      const lib = docLibs[i];
+      const itemsUrl = graph + '/sites/' + siteId + '/lists/' + lib.id + '/items?$expand=driveItem($select=id,name,webUrl,lastModifiedDateTime,file,size)&$top=100';
+      const ir = await fetch(itemsUrl, { headers: { Authorization: bearer } });
+      if (!ir.ok) continue;
+      const itemsData = await ir.json();
+      const items = itemsData.value || [];
+      for (let j = 0; j < items.length; j++) {
+        const di = items[j].driveItem;
+        if (!di || !di.file || !docExts.test(di.name)) continue;
+        files.push({
+          id: di.id,
+          name: di.name,
+          size: di.size,
+          modified: di.lastModifiedDateTime,
+          webUrl: di.webUrl,
+          folder: lib.displayName,
+          path: lib.displayName,
+        });
+      }
+    }
+    return res.json({ files: files, siteId: siteId, libCount: docLibs.length });
+  } catch (err) {
+    return res.status(502).json({ error: err.message });
+  }
+}
 export async function oauthCallback(req, res) {
   const { code, error, error_description } = req.query;
   if (error) return res.redirect(`/?sp_error=${encodeURIComponent(error_description || error)}`);
@@ -157,4 +283,7 @@ export async function refreshToken(req, res) {
     res.status(502).json({ error: err.message });
   }
 }
+
+
+
 

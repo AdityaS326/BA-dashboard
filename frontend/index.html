@@ -23,7 +23,6 @@
     <div class="sb-logo" style="font-size:17px;line-height:1">🦅</div>
     <div class="sb-name-wrap">
       <div class="sb-title">Falcon App</div>
-      <div class="sb-sub">v3.0</div>
       <div id="sb-project-name" style="display:none;font-size:10px;font-weight:600;color:var(--blue);margin-top:2px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em"></div>
     </div>
   </div>
@@ -56,17 +55,18 @@
 
 <!-- MAIN -->
 <div id="main">
-  <div id="topbar">
+  <div id="topbar" style="position:relative">
     <div class="tb-left">
       <span class="tb-page" id="page-title">Teams meetings</span>
     </div>
+    <div id="tb-welcome" style="position:absolute;left:50%;transform:translateX(-50%);top:50%;margin-top:-10px;font-size:15px;font-weight:600;color:var(--text);display:none;white-space:nowrap;pointer-events:none"></div>
     <div class="tb-right">
       <span class="tb-pill" id="reminder-pill" style="display:none" onclick="nav(document.querySelector('[data-panel=cal]'))">
         <i class="ti ti-bell" style="font-size:11px"></i> <span id="reminder-txt"></span>
       </span>
       <span class="tb-pill live"><i class="ti ti-circle-check" style="font-size:11px"></i> Live</span>
       <span class="tb-pill" id="topbar-time">--:--</span>
-      <span class="tb-pill">Wk 24 · 2026</span>
+      <span class="tb-pill" id="topbar-week"></span>
       <button onclick="ewsDisconnect()" title="Logout"
         style="display:flex;align-items:center;gap:5px;padding:5px 11px;font-size:12px;font-weight:500;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;transition:all .15s"
         onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'"
@@ -258,23 +258,38 @@
 <div class="panel" id="p-ov">
   <div id="ov-reminder"></div>
   <!-- Project + AI platform setup -->
-  <div class="card" style="margin-bottom:12px">
-    <div class="card-hd"><span class="card-title"><i class="ti ti-rocket"></i>Project &amp; AI setup</span></div>
+  <div class="card" id="ov-setup-card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-rocket"></i>Project &amp; AI setup</span><span id="ov-setup-hint" style="font-size:11px;color:var(--muted);font-weight:400">Configure once — applies across all features</span></div>
     <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
       <div style="flex:1;min-width:160px">
         <label>Project name</label>
-        <input id="ov-project" placeholder="e.g. EEL v2, GPOS, Customer Portal…" oninput="updateProjectName(this.value)" style="margin-bottom:0">
+        <input id="ov-project" placeholder="Enter your Project Name..." style="margin-bottom:4px;width:100%;box-sizing:border-box" onkeydown="if(event.key==='Enter') submitProjectSetup()" oninput="document.getElementById('ov-project-err').style.display='none';this.style.border=''">
+        <div id="ov-project-err" style="display:none;font-size:11px;color:var(--red);margin-bottom:0">Project name is required.</div>
       </div>
-      <div style="width:240px">
+      <div style="flex:1;min-width:160px">
         <label>AI platform</label>
-        <select id="ov-ai-platform" style="margin-bottom:0" onchange="setAIProvider(this.value)">
+        <select id="ov-ai-platform" style="margin-bottom:0;width:100%;box-sizing:border-box">
           <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
           <option value="ollama">🦙 Ollama — Local LLM</option>
           <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
         </select>
       </div>
+      <button class="primary" style="height:36px;padding:0 20px;flex-shrink:0;display:inline-flex;align-items:center;gap:6px" onclick="submitProjectSetup()">
+        <i class="ti ti-check"></i> Submit
+      </button>
     </div>
   </div>
+  <!-- Prompt shown before setup is submitted -->
+  <div id="ov-setup-prompt" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px;text-align:center">
+    <div style="width:52px;height:52px;background:var(--surface2);border-radius:14px;display:flex;align-items:center;justify-content:center">
+      <i class="ti ti-layout-dashboard" style="font-size:26px;color:var(--blue)"></i>
+    </div>
+    <div style="font-size:15px;font-weight:600;color:var(--text)">Enter project &amp; AI details to view Dashboard</div>
+    <div style="font-size:13px;color:var(--muted);max-width:340px;line-height:1.6">Fill in the Project name and select an AI platform above, then click <strong>Submit</strong> to unlock the full dashboard.</div>
+  </div>
+
+  <!-- Main dashboard content — revealed after project setup -->
+  <div id="ov-main-content" style="display:none">
   <!-- Stat cards — all populated dynamically from EWS + DOCS -->
   <div class="g4">
     <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar-event"></i>Meetings today</div><div class="stat-value" id="stat-today-meetings">—</div><div class="stat-sub" id="stat-today-sub">Connect Exchange</div></div>
@@ -310,6 +325,7 @@
       </div>
     </div>
   </div>
+  </div><!-- /ov-main-content -->
 </div>
 
 <!-- ██ CALENDAR ████████████████████████████████████████████████████████████ -->
@@ -324,15 +340,53 @@
         <div class="cal-grid" id="cal-cells"></div>
       </div>
       <div class="card">
-        <div class="card-hd"><span class="card-title"><i class="ti ti-plus"></i>Add event</span></div>
-        <label>Title</label><input id="ev-title" placeholder="EEL Architecture Review">
-        <div class="g2" style="gap:8px"><div><label>Date</label><input type="date" id="ev-date"></div><div><label>Time</label><input id="ev-time" value="10:00 AM"></div></div>
-        <div class="g2" style="gap:8px"><div><label>Duration</label><select id="ev-dur"><option>15 min</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div><div><label>Type</label><select id="ev-type"><option value="meet">Meeting</option><option value="review">Review</option><option value="deadline">Deadline</option><option value="block">Focus block</option></select></div></div>
-        <label>Attendees <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(email addresses for invite)</span></label>
-        <input id="ev-att" placeholder="vijay@company.com, aditya@company.com…">
-        <label>Location <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
-        <input id="ev-location" placeholder="Conference Room / Teams link">
-        <button class="primary" id="ev-add-btn" onclick="addEvent()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px"><i class="ti ti-send"></i> Add &amp; Send Invite</button>
+        <div class="card-hd" style="margin-bottom:14px">
+          <span class="card-title"><i class="ti ti-calendar-plus"></i>Create Meeting</span>
+          <select id="ev-type" style="margin:0;font-size:12px;width:130px">
+            <option value="meet">Meeting</option>
+            <option value="review">Review</option>
+            <option value="deadline">Deadline</option>
+            <option value="block">Focus block</option>
+          </select>
+        </div>
+
+        <label>Subject</label>
+        <input id="ev-title" placeholder="e.g. Sprint Review, Architecture Discussion…" style="margin-bottom:10px">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <label>Start date</label>
+            <input type="date" id="ev-date" style="margin-bottom:0">
+          </div>
+          <div>
+            <label>Start time</label>
+            <input id="ev-time" value="10:00 AM" placeholder="10:00 AM" style="margin-bottom:0">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <label>Duration</label>
+            <select id="ev-dur" style="margin-bottom:0">
+              <option>15 min</option><option>30 min</option><option selected>45 min</option>
+              <option>60 min</option><option>90 min</option><option>120 min</option>
+            </select>
+          </div>
+          <div>
+            <label>Location</label>
+            <input id="ev-location" placeholder="Room / Teams link" style="margin-bottom:0">
+          </div>
+        </div>
+
+        <label>Attendees <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(comma-separated emails)</span></label>
+        <input id="ev-att" placeholder="e.g. vijay@company.com, aditya@company.com" style="margin-bottom:10px">
+
+        <label>Agenda / Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+        <textarea id="ev-desc" rows="2" placeholder="Meeting agenda or description…" style="resize:vertical;margin-bottom:12px;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface2);color:var(--text);width:100%;box-sizing:border-box;font-family:inherit"></textarea>
+
+        <button class="primary" id="ev-add-btn" onclick="addEvent()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px">
+          <i class="ti ti-send"></i> Create &amp; Send Invite
+        </button>
         <div id="ev-invite-status" style="display:none;margin-top:8px;font-size:12px;padding:8px 10px;border-radius:var(--r-sm)"></div>
       </div>
     </div>
@@ -414,8 +468,8 @@
     <!-- Reporter details -->
     <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
       <div class="card-hd"><span class="card-title"><i class="ti ti-user"></i>Reporter details</span></div>
-      <label>Name</label><input id="rp-name" value="Mahesh Beesu">
-      <label>Department</label><input id="rp-dept" value="Technology">
+      <label>Name</label><input id="rp-name" placeholder="Your full name">
+      <label>Department</label><input id="rp-dept" placeholder="e.g. Technology, Product, QA">
       <label>Start time</label><input type="datetime-local" id="rp-start">
       <label>End time</label><input type="datetime-local" id="rp-end">
     </div>
@@ -429,7 +483,7 @@
         <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
       </select>
       <label>Additional context <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional — what you worked on, key achievements…)</span></label>
-      <textarea id="rp-context" rows="3" placeholder="e.g. Completed BRD for EEL v2, attended sprint review, resolved GPOS subscription bug..." style="width:100%;resize:vertical;flex:1;min-height:72px;margin-bottom:12px"></textarea>
+      <textarea id="rp-context" rows="3" placeholder="Describe your work..." style="width:100%;resize:vertical;flex:1;min-height:72px;margin-bottom:12px"></textarea>
       <button class="primary" style="margin-top:auto" onclick="generateReport()"><i class="ti ti-bolt"></i> Generate report</button>
     </div>
   </div>
@@ -514,16 +568,49 @@
 
 <!-- ██ DOCUMENTS ███████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-dc">
-  <!-- Upload form -->
+  <!-- SharePoint sync card -->
   <div class="card" style="margin-bottom:12px">
-    <div class="card-hd" style="margin-bottom:10px"><span class="card-title"><i class="ti ti-cloud-upload"></i>Upload document</span></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <label id="dc-file-lbl" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;color:var(--text);flex-shrink:0;white-space:nowrap">
+    <div class="card-hd" style="margin-bottom:10px">
+      <span class="card-title"><i class="ti ti-brand-sharepoint" style="color:#0078d4"></i>SharePoint Documents</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="sp-sync-user" style="font-size:11px;color:var(--muted)"></span>
+        <button class="sm" id="sp-sync-btn" onclick="syncSharePointDocs(this)">
+          <i class="ti ti-refresh"></i> Sync
+        </button>
+      </div>
+    </div>
+
+    <!-- Source selector: Recent files vs Site -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;flex-shrink:0">
+        <button id="sp-src-recent" onclick="spSetSource('recent',this)"
+          style="padding:5px 12px;font-size:12px;border:none;background:var(--blue);color:#fff;cursor:pointer;font-weight:500">
+          <i class="ti ti-clock"></i> Recent files
+        </button>
+        <button id="sp-src-site" onclick="spSetSource('site',this)"
+          style="padding:5px 12px;font-size:12px;border:none;background:var(--surface2);color:var(--muted);cursor:pointer">
+          <i class="ti ti-building"></i> By site
+        </button>
+      </div>
+      <!-- Site selector — shown only in "By site" mode -->
+      <div id="sp-site-row" style="display:none;flex:1;min-width:200px;display:none;gap:6px;align-items:center">
+        <select id="sp-site-select" style="flex:1;margin:0;font-size:12px" onchange="spOnSiteChange()">
+          <option value="">— select a site —</option>
+        </select>
+        <button class="sm" onclick="loadSpSites(this)"><i class="ti ti-refresh"></i> Load sites</button>
+      </div>
+    </div>
+
+    <div id="sp-sync-status" style="display:none;font-size:12px;padding:7px 10px;border-radius:var(--r-sm);margin-bottom:4px"></div>
+
+    <!-- Upload row -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+      <label id="dc-file-lbl" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text);flex-shrink:0;white-space:nowrap">
         <i class="ti ti-file-plus"></i><span id="dc-file-name">Choose file (.pdf / .docx)</span>
         <input type="file" id="dc-file-input" accept=".pdf,.doc,.docx" style="display:none" onchange="onDocFileChosen(this)">
       </label>
-      <input id="dc-upload-path" placeholder="SharePoint folder path e.g. Documents/BA Hub" style="flex:1;margin:0;min-width:180px">
-      <button class="primary sm" onclick="uploadDocFromForm(this)" style="flex-shrink:0"><i class="ti ti-upload"></i> Upload</button>
+      <input id="dc-upload-path" placeholder="SharePoint folder path e.g. Documents/BA Hub" style="flex:1;margin:0;min-width:180px;font-size:12px">
+      <button class="sm" onclick="uploadDocFromForm(this)" style="flex-shrink:0"><i class="ti ti-upload"></i> Upload</button>
     </div>
     <div id="dc-upload-status" style="display:none;font-size:12px;margin-top:8px;color:var(--muted)"></div>
   </div>
@@ -564,18 +651,17 @@
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Type</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
             <tbody id="stakeholder-tbody">
-              <tr id="lv-empty-row"><td colspan="6" style="text-align:center;color:var(--muted);padding:16px;font-size:12px">No members yet — add one below.</td></tr>
+              <tr id="lv-empty-row"><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;font-size:12px">No members yet — add one below.</td></tr>
             </tbody>
           </table>
         </div>
         <!-- Add member form -->
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:1;min-width:110px"><label style="font-size:11px;margin-bottom:3px;display:block">Name</label><input id="lv-new-name" placeholder="Full name" style="margin:0"></div>
-          <div style="flex:1;min-width:110px"><label style="font-size:11px;margin-bottom:3px;display:block">Role</label><input id="lv-new-role" placeholder="e.g. Developer" style="margin:0"></div>
-          <div style="width:120px"><label style="font-size:11px;margin-bottom:3px;display:block">Type</label><select id="lv-new-type" style="margin:0"><option>Full Time</option><option>Part Time</option><option>Contractor</option></select></div>
-          <button class="sm primary" style="height:34px;flex-shrink:0" onclick="addTeamMember()"><i class="ti ti-plus"></i> Add</button>
+          <div style="flex:1;min-width:130px"><label style="font-size:11px;margin-bottom:3px;display:block">Name</label><input id="lv-new-name" placeholder="Full name" style="margin:0"></div>
+          <div style="flex:1;min-width:130px"><label style="font-size:11px;margin-bottom:3px;display:block">Role</label><input id="lv-new-role" placeholder="e.g. Developer, BA, QA" style="margin:0" onkeydown="if(event.key==='Enter')addTeamMember()"></div>
+          <button class="sm primary" style="height:34px;flex-shrink:0;margin-top:18px" onclick="addTeamMember()"><i class="ti ti-plus"></i> Add</button>
         </div>
         <div id="lv-sync-status" style="display:none;font-size:12px;color:var(--muted);margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--r-sm)"></div>
       </div>
@@ -605,18 +691,46 @@
 
 <!-- ██ OUTLOOK ████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-ol">
+
+  <!-- connection status bar -->
   <div class="card" style="margin-bottom:12px;padding:10px 14px;display:flex;align-items:center;gap:10px" id="ol-token-status">
     <i class="ti ti-server" style="font-size:16px;color:var(--blue);flex-shrink:0"></i>
     <div style="font-size:12px;color:var(--muted);flex:1">
       <span id="ol-ews-hint">Uses your Exchange credentials from the Teams panel. <strong>Connect in Teams first.</strong></span>
       <span id="ol-ews-ok" style="display:none;color:var(--green)"><i class="ti ti-circle-check" style="font-size:11px"></i> Exchange connected — inbox synced from EWS</span>
     </div>
+    <button class="sm" onclick="window.showOlCompose()" style="gap:5px"><i class="ti ti-pencil-plus"></i> Compose</button>
     <button class="sm primary" onclick="syncEWSEmails(this)"><i class="ti ti-refresh"></i> Load inbox</button>
   </div>
+
+  <!-- compose new email (hidden by default) -->
+  <div id="ol-compose-area" style="display:none;margin-bottom:12px">
+    <div class="card">
+      <div class="card-hd" style="margin-bottom:12px">
+        <span class="card-title"><i class="ti ti-mail-forward"></i>New Email</span>
+        <button class="sm" onclick="document.getElementById('ol-compose-area').style.display='none'" style="padding:3px 8px;font-size:11px"><i class="ti ti-x"></i> Close</button>
+      </div>
+      <label>To</label>
+      <input id="ol-compose-to" type="email" placeholder="recipient@company.com" style="margin-bottom:8px">
+      <label>CC <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input id="ol-compose-cc" type="email" placeholder="cc@company.com" style="margin-bottom:8px">
+      <label>Subject</label>
+      <input id="ol-compose-subject" placeholder="Email subject" style="margin-bottom:8px">
+      <label>Message</label>
+      <textarea id="ol-compose-body" rows="6" placeholder="Type your message here…" style="resize:vertical;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface2);color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;margin-bottom:10px"></textarea>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="primary" id="ol-compose-send-btn" onclick="sendComposedEmail(this)" style="display:flex;align-items:center;gap:6px;padding:9px 18px"><i class="ti ti-send"></i> Send Email</button>
+        <button onclick="window.aiDraftCompose()" style="display:flex;align-items:center;gap:6px;font-size:12px"><i class="ti ti-wand"></i> AI Draft</button>
+        <div id="ol-compose-status" style="font-size:12px;display:none;padding:6px 10px;border-radius:var(--r-sm);flex:1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- inbox + detail -->
   <div class="g2">
     <div>
       <div id="ol-list" style="display:flex;flex-direction:column;gap:6px">
-        <div style="font-size:12px;color:var(--hint);padding:24px 0;text-align:center"><i class="ti ti-mail" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Microsoft 365 in the Teams panel, then click Load inbox.</div>
+        <div style="font-size:12px;color:var(--hint);padding:24px 0;text-align:center"><i class="ti ti-mail" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Exchange in the Teams panel, then click Load inbox.</div>
       </div>
     </div>
     <div>
@@ -626,7 +740,7 @@
         <div class="term" id="ol-draft-text" contenteditable="true" style="min-height:120px;cursor:text;outline:none" spellcheck="true"></div>
         <div class="btn-row" style="margin-top:8px">
           <button onclick="copyText('ol-draft-text')"><i class="ti ti-copy"></i> Copy</button>
-          <button onclick="sendOutlookDraft()"><i class="ti ti-send"></i> Send via Outlook</button>
+          <button onclick="sendOutlookDraft()"><i class="ti ti-send"></i> Send Reply</button>
           <button onclick="sendViaTeams()"><i class="ti ti-brand-teams"></i> Send via Teams</button>
         </div>
       </div>

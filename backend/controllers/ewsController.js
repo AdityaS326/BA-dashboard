@@ -1,4 +1,4 @@
-// backend/controllers/ewsController.js
+﻿// backend/controllers/ewsController.js
 // Uses httpntlm to handle the 3-way NTLM handshake required by on-premise Exchange.
 // Also accepts self-signed certs and TLS 1.0 (common on on-premise Exchange).
 
@@ -117,55 +117,61 @@ export async function getMeetings(req, res) {
   const endISO   = end.toISOString().replace(/\.\d{3}Z$/, "Z");
   const body     = buildSOAP(startISO, endISO);
 
+const soapBody = buildCreateMeetingSOAP(
+    subject,
+    toISO(startDate),
+    toISO(endDate),
+    attendees || [],
+    body,
+    location,
+    startDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    endDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  );
+
+  console.log('[createMeeting] Sending to', ewsUrl, '| subject:', subject, '| attendees:', (attendees || []).join(', ') || '(none)');
+
   try {
     const response = await ntlmPost({
-      url,
-      username:  user,
-      password,
-      domain,
-      workstation: "",
-      body,
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction":   '"http://schemas.microsoft.com/exchange/services/2006/messages/FindItem"',
-      },
-      // Accept self-signed certs and old TLS versions common on corporate Exchange
+      url: ewsUrl, username: user, password, domain, workstation: '',
+      body: soapBody,
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
       rejectUnauthorized: false,
     });
 
+    console.log('[createMeeting] Exchange HTTP status:', response.statusCode);
+
     if (response.statusCode === 401) {
-      return res.status(401).json({ error: "Invalid credentials — wrong username or password." });
+      console.log('[createMeeting] Auth failed - invalid credentials');
+      return res.status(401).json({ error: 'Invalid Exchange credentials. Check your username and password.' });
     }
-    if (response.statusCode === 403) {
-      return res.status(403).json({ error: "Access denied (403). Your account may not have EWS access enabled." });
-    }
-
-    const xml = response.body || "";
-
-    // SOAP fault check — Exchange often wraps faults inside a 500
-    if (xml.includes("soap:Fault") || xml.includes("<faultstring")) {
-      const fault = xml.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
-      return res.status(500).json({ error: "Exchange SOAP error: " + (fault ? fault[1].trim() : "Unknown fault") });
-    }
-
     if (response.statusCode >= 400) {
-      return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}. Check the EWS URL.` });
+      console.log('[createMeeting] Exchange error body:', response.body?.substring(0, 500));
+      return res.status(response.statusCode).json({ error: 'Exchange returned HTTP ' + response.statusCode });
+    }
+    if (response.body.includes('soap:Fault')) {
+      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+      const detail = fault ? fault[1] : 'Unknown SOAP fault';
+      console.log('[createMeeting] SOAP fault:', detail);
+      return res.status(500).json({ error: 'Exchange error: ' + detail });
+    }
+    if (response.body.includes('ResponseCode')) {
+      const code = response.body.match(/<m:ResponseCode>([^<]+)<\/m:ResponseCode>/i);
+      if (code && code[1] !== 'NoError') {
+        const msg2 = response.body.match(/<m:MessageText>([^<]+)<\/m:MessageText>/i);
+        const detail2 = msg2 ? msg2[1] : code[1];
+        console.log('[createMeeting] EWS ResponseCode error:', detail2);
+        return res.status(500).json({ error: 'Exchange: ' + detail2 });
+      }
     }
 
-    const meetings = parseXML(xml);
-    res.json({ meetings, total: meetings.length, url });
-
+    console.log('[createMeeting] Success - invite sent to', (attendees || []).join(', ') || 'organizer only');
+    const sentTo = (attendees || []).filter(Boolean);
+    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate), sentTo, subject });
   } catch (err) {
-    const msg = err.message || "";
-    if (msg.includes("ENOTFOUND") || msg.includes("getaddrinfo")) {
-      return res.status(502).json({ error: `Cannot find Exchange server. Are you on the ESDS network or VPN?` });
-    }
-    if (msg.includes("ECONNREFUSED")) {
-      return res.status(502).json({ error: "Connection refused by Exchange server. EWS may be disabled." });
-    }
-    if (msg.includes("ETIMEDOUT") || msg.includes("timed out")) {
-      return res.status(504).json({ error: "Connection timed out. Connect to ESDS office WiFi or VPN first." });
-    }
+    const msg = err.message || '';
+    console.log('[createMeeting] Exception:', msg);
+    if (msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED'))
+      return res.status(502).json({ error: 'Cannot reach Exchange server at ' + ewsUrl + '. Check the URL.' });
     res.status(502).json({ error: msg });
   }
 }
@@ -259,20 +265,61 @@ export async function getEmails(req, res) {
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
 
+const soapBody = buildCreateMeetingSOAP(
+    subject,
+    toISO(startDate),
+    toISO(endDate),
+    attendees || [],
+    body,
+    location,
+    startDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    endDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  );
+
+  console.log('[createMeeting] Sending to', ewsUrl, '| subject:', subject, '| attendees:', (attendees || []).join(', ') || '(none)');
+
   try {
     const response = await ntlmPost({
-      url, username: user, password, domain, workstation: "",
-      body: buildEmailSOAP(25),
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/FindItem"' },
+      url: ewsUrl, username: user, password, domain, workstation: '',
+      body: soapBody,
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
       rejectUnauthorized: false,
     });
-    if (response.statusCode === 401) return res.status(401).json({ error: "Invalid credentials." });
-    if (response.statusCode >= 400) return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}` });
-    const emails = parseEmails(response.body);
-    res.json({ emails, total: emails.length });
+
+    console.log('[createMeeting] Exchange HTTP status:', response.statusCode);
+
+    if (response.statusCode === 401) {
+      console.log('[createMeeting] Auth failed - invalid credentials');
+      return res.status(401).json({ error: 'Invalid Exchange credentials. Check your username and password.' });
+    }
+    if (response.statusCode >= 400) {
+      console.log('[createMeeting] Exchange error body:', response.body?.substring(0, 500));
+      return res.status(response.statusCode).json({ error: 'Exchange returned HTTP ' + response.statusCode });
+    }
+    if (response.body.includes('soap:Fault')) {
+      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+      const detail = fault ? fault[1] : 'Unknown SOAP fault';
+      console.log('[createMeeting] SOAP fault:', detail);
+      return res.status(500).json({ error: 'Exchange error: ' + detail });
+    }
+    if (response.body.includes('ResponseCode')) {
+      const code = response.body.match(/<m:ResponseCode>([^<]+)<\/m:ResponseCode>/i);
+      if (code && code[1] !== 'NoError') {
+        const msg2 = response.body.match(/<m:MessageText>([^<]+)<\/m:MessageText>/i);
+        const detail2 = msg2 ? msg2[1] : code[1];
+        console.log('[createMeeting] EWS ResponseCode error:', detail2);
+        return res.status(500).json({ error: 'Exchange: ' + detail2 });
+      }
+    }
+
+    console.log('[createMeeting] Success - invite sent to', (attendees || []).join(', ') || 'organizer only');
+    const sentTo = (attendees || []).filter(Boolean);
+    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate), sentTo, subject });
   } catch (err) {
-    const msg = err.message || "";
-    if (msg.includes("ENOTFOUND") || msg.includes("ETIMEDOUT")) return res.status(502).json({ error: "Cannot reach Exchange. Are you on the ESDS network?" });
+    const msg = err.message || '';
+    console.log('[createMeeting] Exception:', msg);
+    if (msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED'))
+      return res.status(502).json({ error: 'Cannot reach Exchange server at ' + ewsUrl + '. Check the URL.' });
     res.status(502).json({ error: msg });
   }
 }
@@ -306,6 +353,19 @@ export async function getEmailBody(req, res) {
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
   const ntlmOpts = { url, username: user, password, domain, workstation: "", rejectUnauthorized: false };
+
+const soapBody = buildCreateMeetingSOAP(
+    subject,
+    toISO(startDate),
+    toISO(endDate),
+    attendees || [],
+    body,
+    location,
+    startDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    endDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  );
+
+  console.log('[createMeeting] Sending to', ewsUrl, '| subject:', subject, '| attendees:', (attendees || []).join(', ') || '(none)');
 
   try {
     const response = await ntlmPost({
@@ -352,7 +412,11 @@ export async function getEmailBody(req, res) {
 
     res.json({ body: html, bodyType: "html" });
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    const msg = err.message || '';
+    console.log('[createMeeting] Exception:', msg);
+    if (msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED'))
+      return res.status(502).json({ error: 'Cannot reach Exchange server at ' + ewsUrl + '. Check the URL.' });
+    res.status(502).json({ error: msg });
   }
 }
 
@@ -397,23 +461,61 @@ export async function sendEmail(req, res) {
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
 
+const soapBody = buildCreateMeetingSOAP(
+    subject,
+    toISO(startDate),
+    toISO(endDate),
+    attendees || [],
+    body,
+    location,
+    startDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    endDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  );
+
+  console.log('[createMeeting] Sending to', ewsUrl, '| subject:', subject, '| attendees:', (attendees || []).join(', ') || '(none)');
+
   try {
     const response = await ntlmPost({
-      url, username: user, password, domain, workstation: "",
-      body: buildSendEmailSOAP(to, cc || "", subject, body || ""),
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
+      url: ewsUrl, username: user, password, domain, workstation: '',
+      body: soapBody,
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
       rejectUnauthorized: false,
     });
-    if (response.statusCode === 401) return res.status(401).json({ error: "Invalid Exchange credentials." });
-    if (response.statusCode >= 400)  return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}` });
-    if (response.body.includes("soap:Fault")) {
-      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
-      return res.status(500).json({ error: "Exchange SOAP error: " + (fault ? fault[1] : "Unknown") });
+
+    console.log('[createMeeting] Exchange HTTP status:', response.statusCode);
+
+    if (response.statusCode === 401) {
+      console.log('[createMeeting] Auth failed - invalid credentials');
+      return res.status(401).json({ error: 'Invalid Exchange credentials. Check your username and password.' });
     }
-    res.json({ ok: true });
+    if (response.statusCode >= 400) {
+      console.log('[createMeeting] Exchange error body:', response.body?.substring(0, 500));
+      return res.status(response.statusCode).json({ error: 'Exchange returned HTTP ' + response.statusCode });
+    }
+    if (response.body.includes('soap:Fault')) {
+      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+      const detail = fault ? fault[1] : 'Unknown SOAP fault';
+      console.log('[createMeeting] SOAP fault:', detail);
+      return res.status(500).json({ error: 'Exchange error: ' + detail });
+    }
+    if (response.body.includes('ResponseCode')) {
+      const code = response.body.match(/<m:ResponseCode>([^<]+)<\/m:ResponseCode>/i);
+      if (code && code[1] !== 'NoError') {
+        const msg2 = response.body.match(/<m:MessageText>([^<]+)<\/m:MessageText>/i);
+        const detail2 = msg2 ? msg2[1] : code[1];
+        console.log('[createMeeting] EWS ResponseCode error:', detail2);
+        return res.status(500).json({ error: 'Exchange: ' + detail2 });
+      }
+    }
+
+    console.log('[createMeeting] Success - invite sent to', (attendees || []).join(', ') || 'organizer only');
+    const sentTo = (attendees || []).filter(Boolean);
+    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate), sentTo, subject });
   } catch (err) {
-    const msg = err.message || "";
-    if (msg.includes("ENOTFOUND") || msg.includes("ETIMEDOUT")) return res.status(502).json({ error: "Cannot reach Exchange. Are you on the ESDS network?" });
+    const msg = err.message || '';
+    console.log('[createMeeting] Exception:', msg);
+    if (msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED'))
+      return res.status(502).json({ error: 'Cannot reach Exchange server at ' + ewsUrl + '. Check the URL.' });
     res.status(502).json({ error: msg });
   }
 }
@@ -437,35 +539,58 @@ export async function discoverEWS(req, res) {
 }
 
 // POST /api/ews/create-meeting
-function buildCreateMeetingSOAP(subject, start, end, attendees, body, location) {
-  const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function buildCreateMeetingSOAP(subject, start, end, attendees, userBody, location, startDisplay, endDisplay) {
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const attXml = (attendees || []).filter(Boolean).map(
-    (a) => `<t:Attendee><t:Mailbox><t:EmailAddress>${esc(a.trim())}</t:EmailAddress></t:Mailbox></t:Attendee>`
-  ).join("");
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
-  xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
-  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Header><t:RequestServerVersion Version="Exchange2013_SP1"/></soap:Header>
-  <soap:Body>
-    <m:CreateItem MessageDisposition="SendAndSaveCopy" SendMeetingInvitations="SendToAllAndSaveCopy">
-      <m:SavedItemFolderId><t:DistinguishedFolderId Id="calendar"/></m:SavedItemFolderId>
-      <m:Items>
-        <t:CalendarItem>
-          <t:Subject>${esc(subject)}</t:Subject>
-          <t:Body BodyType="HTML">${esc(body || `You are invited to: ${subject}`)}</t:Body>
-          <t:Start>${start}</t:Start>
-          <t:End>${end}</t:End>
-          <t:IsAllDayEvent>false</t:IsAllDayEvent>
-          ${location ? `<t:Location>${esc(location)}</t:Location>` : ""}
-          ${attXml ? `<t:RequiredAttendees>${attXml}</t:RequiredAttendees>` : ""}
-        </t:CalendarItem>
-      </m:Items>
-    </m:CreateItem>
-  </soap:Body>
-</soap:Envelope>`;
+    (a) => '<t:Attendee><t:Mailbox><t:EmailAddress>' + esc(a.trim()) + '</t:EmailAddress></t:Mailbox></t:Attendee>'
+  ).join('');
+
+  // Build proper HTML email body so attendees see a formatted meeting invite
+  const agendaSection = userBody
+    ? '<p><strong>Agenda / Notes:</strong><br>' + esc(userBody).replace(/\n/g, '<br>') + '</p>'
+    : '';
+  const locRow = location
+    ? '<tr><td style="padding:2px 14px 2px 0;color:#555;white-space:nowrap"><strong>Location</strong></td><td>' + esc(location) + '</td></tr>'
+    : '';
+  const attRow = (attendees && attendees.length)
+    ? '<tr><td style="padding:2px 14px 2px 0;color:#555;white-space:nowrap"><strong>Attendees</strong></td><td>' + attendees.filter(Boolean).map((a) => esc(a.trim())).join(', ') + '</td></tr>'
+    : '';
+
+  const htmlBody = '<html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#222">'
+    + '<p>You have been invited to the following meeting:</p>'
+    + '<table cellpadding="2" cellspacing="0" style="border-collapse:collapse;margin-bottom:16px">'
+    + '<tr><td style="padding:2px 14px 2px 0;color:#555;white-space:nowrap"><strong>Subject</strong></td><td>' + esc(subject) + '</td></tr>'
+    + '<tr><td style="padding:2px 14px 2px 0;color:#555;white-space:nowrap"><strong>Start</strong></td><td>' + esc(startDisplay || start) + '</td></tr>'
+    + '<tr><td style="padding:2px 14px 2px 0;color:#555;white-space:nowrap"><strong>End</strong></td><td>' + esc(endDisplay || end) + '</td></tr>'
+    + locRow + attRow
+    + '</table>'
+    + agendaSection
+    + '</body></html>';
+
+  return '<?xml version="1.0" encoding="utf-8"?>'
+    + '<soap:Envelope'
+    + ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+    + ' xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"'
+    + ' xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"'
+    + ' xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
+    + '<soap:Header><t:RequestServerVersion Version="Exchange2013_SP1"/></soap:Header>'
+    + '<soap:Body>'
+    + '<m:CreateItem MessageDisposition="SendAndSaveCopy" SendMeetingInvitations="SendToAllAndSaveCopy">'
+    + '<m:SavedItemFolderId><t:DistinguishedFolderId Id="calendar"/></m:SavedItemFolderId>'
+    + '<m:Items>'
+    + '<t:CalendarItem>'
+    + '<t:Subject>' + esc(subject) + '</t:Subject>'
+    + '<t:Body BodyType="HTML">' + esc(htmlBody) + '</t:Body>'
+    + '<t:Start>' + start + '</t:Start>'
+    + '<t:End>' + end + '</t:End>'
+    + '<t:IsAllDayEvent>false</t:IsAllDayEvent>'
+    + (location ? '<t:Location>' + esc(location) + '</t:Location>' : '')
+    + (attXml ? '<t:RequiredAttendees>' + attXml + '</t:RequiredAttendees>' : '')
+    + '</t:CalendarItem>'
+    + '</m:Items>'
+    + '</m:CreateItem>'
+    + '</soap:Body>'
+    + '</soap:Envelope>';
 }
 
 export async function createMeeting(req, res) {
@@ -492,24 +617,61 @@ export async function createMeeting(req, res) {
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
 
+const soapBody = buildCreateMeetingSOAP(
+    subject,
+    toISO(startDate),
+    toISO(endDate),
+    attendees || [],
+    body,
+    location,
+    startDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+    endDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+  );
+
+  console.log('[createMeeting] Sending to', ewsUrl, '| subject:', subject, '| attendees:', (attendees || []).join(', ') || '(none)');
+
   try {
     const response = await ntlmPost({
-      url: ewsUrl, username: user, password, domain, workstation: "",
-      body: buildCreateMeetingSOAP(subject, toISO(startDate), toISO(endDate), attendees || [], body, location),
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
+      url: ewsUrl, username: user, password, domain, workstation: '',
+      body: soapBody,
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
       rejectUnauthorized: false,
     });
-    if (response.statusCode === 401) return res.status(401).json({ error: "Invalid Exchange credentials." });
-    if (response.statusCode >= 400)  return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}` });
-    if (response.body.includes("soap:Fault")) {
-      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
-      return res.status(500).json({ error: "Exchange error: " + (fault ? fault[1] : "Unknown") });
+
+    console.log('[createMeeting] Exchange HTTP status:', response.statusCode);
+
+    if (response.statusCode === 401) {
+      console.log('[createMeeting] Auth failed - invalid credentials');
+      return res.status(401).json({ error: 'Invalid Exchange credentials. Check your username and password.' });
     }
-    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate) });
+    if (response.statusCode >= 400) {
+      console.log('[createMeeting] Exchange error body:', response.body?.substring(0, 500));
+      return res.status(response.statusCode).json({ error: 'Exchange returned HTTP ' + response.statusCode });
+    }
+    if (response.body.includes('soap:Fault')) {
+      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+      const detail = fault ? fault[1] : 'Unknown SOAP fault';
+      console.log('[createMeeting] SOAP fault:', detail);
+      return res.status(500).json({ error: 'Exchange error: ' + detail });
+    }
+    if (response.body.includes('ResponseCode')) {
+      const code = response.body.match(/<m:ResponseCode>([^<]+)<\/m:ResponseCode>/i);
+      if (code && code[1] !== 'NoError') {
+        const msg2 = response.body.match(/<m:MessageText>([^<]+)<\/m:MessageText>/i);
+        const detail2 = msg2 ? msg2[1] : code[1];
+        console.log('[createMeeting] EWS ResponseCode error:', detail2);
+        return res.status(500).json({ error: 'Exchange: ' + detail2 });
+      }
+    }
+
+    console.log('[createMeeting] Success - invite sent to', (attendees || []).join(', ') || 'organizer only');
+    const sentTo = (attendees || []).filter(Boolean);
+    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate), sentTo, subject });
   } catch (err) {
-    const msg = err.message || "";
-    if (msg.includes("ENOTFOUND") || msg.includes("ETIMEDOUT"))
-      return res.status(502).json({ error: "Cannot reach Exchange server." });
+    const msg = err.message || '';
+    console.log('[createMeeting] Exception:', msg);
+    if (msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED'))
+      return res.status(502).json({ error: 'Cannot reach Exchange server at ' + ewsUrl + '. Check the URL.' });
     res.status(502).json({ error: msg });
   }
 }
