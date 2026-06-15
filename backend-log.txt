@@ -1,0 +1,100 @@
+
+> ba-hub-backend@3.0.0 dev
+> nodemon server.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 8633, Requested 4273. Please try again in 4.53s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 8614, Requested 4273. Please try again in 4.435s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 10127, Requested 4273. Please try again in 12s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[aiRouter] ANTHROPIC_API_KEY not set, falling back to Groq
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 10785, Requested 4273. Please try again in 15.29s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[aiRouter] ANTHROPIC_API_KEY not set, falling back to Groq
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 10663, Requested 4273. Please try again in 14.68s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[aiRouter] ANTHROPIC_API_KEY not set, falling back to Groq
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 10623, Requested 1477. Please try again in 500ms. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[aiRouter] ANTHROPIC_API_KEY not set, falling back to Groq
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 10597, Requested 4273. Please try again in 14.35s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[aiRouter] ANTHROPIC_API_KEY not set, falling back to Groq
+[reportController] Groq API error 429: {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ktxvbnbse4evg69mx9wpcnc6` service tier `on_demand` on tokens per minute (TPM): Limit 12000, Used 10595, Requested 1477. Please try again in 360ms. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[claudeController] fetch failed
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+
+✅  BA Hub backend running at: http://localhost:3000
+   Frontend served at:          http://localhost:3000
+   API health:                  http://localhost:3000/api/health
+
+[reportController] Ollama is not running at http://localhost:11434. Start it with: ollama serve — then try again, or switch to Groq.

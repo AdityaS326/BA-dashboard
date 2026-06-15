@@ -177,7 +177,10 @@ function _renderTcChatList(chats) {
         <div class="mr-m" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(preview.slice(0, 55))}${preview.length > 55 ? "…" : ""}</div>
       </div>
       ${time ? `<span style="font-size:10px;color:var(--hint);flex-shrink:0">${escHtml(time)}</span>` : ""}`;
-    row.onclick = () => _loadTcMessages(chat.id, name, row);
+    const teamsUrl = `https://teams.microsoft.com/l/chat/${encodeURIComponent(chat.id)}/0`;
+    row.title = "Open in Microsoft Teams";
+    row.style.cursor = "pointer";
+    row.onclick = () => window.open(teamsUrl, "_blank");
     listEl.appendChild(row);
   });
 }
@@ -209,10 +212,12 @@ async function _loadTcMessages(chatId, chatName, row) {
 
   const messages = (data.messages || []).filter(m => m.messageType !== "systemEventMessage").reverse();
 
+  const teamsUrl = `https://teams.microsoft.com/l/chat/${encodeURIComponent(chatId)}/0`;
   panel.innerHTML = `
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
       <i class="ti ti-brand-teams" style="color:#6264a7;font-size:15px"></i> ${escHtml(chatName)}
-      <span class="badge" style="margin-left:auto;background:rgba(98,100,167,.12);color:#6264a7;border-color:rgba(98,100,167,.25)">${messages.length} messages</span>
+      <span class="badge" style="background:rgba(98,100,167,.12);color:#6264a7;border-color:rgba(98,100,167,.25)">${messages.length} messages</span>
+      <a href="${escHtml(teamsUrl)}" target="_blank" style="margin-left:auto;text-decoration:none"><button class="sm" style="font-size:11px;background:#6264a7;color:#fff;border-color:#6264a7;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-external-link" style="font-size:11px"></i> Open in Teams</button></a>
     </div>
     <div id="tc-msg-list" style="display:flex;flex-direction:column;gap:12px;max-height:500px;overflow-y:auto;padding-right:4px">
       ${!messages.length ? '<div style="font-size:12px;color:var(--hint);text-align:center;padding:16px">No messages in this conversation.</div>' : ""}
@@ -311,7 +316,52 @@ tick();
 
 // ── Calendar ───────────────────────────────────────────────────
 window.calNav      = (dir) => { _calNav(dir, events); };
-window.addEvent    = ()    => { events = _addEvent(events); renderCalendar(events); renderSchedule(todayKey(), events); renderOvMeetings(events); document.getElementById("cal-badge").textContent = (events[todayKey()] || []).length; };
+window.addEvent = async () => {
+  // 1 — add locally (existing behaviour)
+  events = _addEvent(events);
+  renderCalendar(events);
+  renderSchedule(todayKey(), events);
+  renderOvMeetings(events);
+  document.getElementById("cal-badge").textContent = (events[todayKey()] || []).length;
+
+  // 2 — send Outlook invite via Exchange if connected
+  const creds = ewsGetCreds();
+  if (!creds.ewsUrl) return; // not connected — local only
+
+  const title    = document.getElementById("ev-title")?.value?.trim();
+  const date     = document.getElementById("ev-date")?.value || new Date().toISOString().slice(0, 10);
+  const time     = document.getElementById("ev-time")?.value?.trim();
+  const dur      = document.getElementById("ev-dur")?.value;
+  const attRaw   = document.getElementById("ev-att")?.value?.trim();
+  const location = document.getElementById("ev-location")?.value?.trim();
+
+  if (!title) return;
+  const attendees = attRaw ? attRaw.split(/[,;]+/).map(a => a.trim()).filter(a => a.includes("@")) : [];
+
+  const statusEl = document.getElementById("ev-invite-status");
+  const btn      = document.getElementById("ev-add-btn");
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending invite via Outlook…"; }
+  if (btn) btn.disabled = true;
+
+  const data = await api.ewsCreateMeeting({
+    ...creds,
+    subject:   title,
+    date,
+    time,
+    duration:  dur,
+    attendees,
+    location,
+  });
+
+  if (btn) btn.disabled = false;
+  if (data.ok) {
+    if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ Invite sent to ${attendees.length ? attendees.join(", ") : "your calendar"} via Outlook.`; }
+    showToast("Meeting invite sent via Outlook!");
+  } else {
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error}`; }
+  }
+  setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 5000);
+};
 
 // ── Overview charts ────────────────────────────────────────────
 window.updateHealthChart = () => {
@@ -809,6 +859,7 @@ function renderEWSMeetings(meetings) {
   renderSchedule(todayKey(), events);
   renderOvMeetings(events);
   document.getElementById("cal-badge").textContent = (events[todayKey()] || []).length;
+  if (window.populateMOMDropdown) window.populateMOMDropdown();
 }
 
 let _ewsMeetings = [];
@@ -968,11 +1019,12 @@ window.ewsConnect = async function (btn) {
   }
   if (errEl) errEl.style.display = "none";
 
-  // Use the field value; if blank, auto-derive from email domain or fall back to ESDS default
+  // Use the field value; if blank, auto-derive from email domain
   let url = urlEl?.value?.trim();
   if (!url) {
     const domain = username.includes("@") ? username.split("@")[1] : "";
-    url = domain ? `https://owa.${domain}/EWS/Exchange.asmx` : "https://owa.esds.co.in/EWS/Exchange.asmx";
+    if (!domain) { if (errEl) { errEl.textContent = "Enter the Exchange server URL or use Auto-detect."; errEl.style.display = "block"; } return; }
+    url = `https://owa.${domain}/EWS/Exchange.asmx`;
     if (urlEl) urlEl.value = url;
   }
 
@@ -1082,7 +1134,8 @@ document.addEventListener("click", (e) => {
 
 window.ewsDiscover = async function (btn) {
   const username = document.getElementById("ews-username")?.value?.trim();
-  const email    = username || "aditya.sridhar@esds.co.in";
+  const email    = username;
+  if (!email) { showToast("Enter your email first, then click Auto-detect."); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-search"></i> Auto-detect'; } return; }
   const resDiv   = document.getElementById("ews-discover-results");
   if (!resDiv) return;
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Detecting...'; }
@@ -1491,99 +1544,135 @@ window.syncOutlookCalendar = async function (btn) {
 };
 
 // ── Weekly report ──────────────────────────────────────────────
-window.wrTab = function (el, tab) {
-  document.querySelectorAll(".seg button").forEach((b) => b.classList.remove("on"));
-  el.classList.add("on");
-  ["gen", "sp", "cfg"].forEach((t) => { const el = document.getElementById("wr-" + t); if (el) el.style.display = "none"; });
-  const active = document.getElementById("wr-" + tab);
-  if (active) active.style.display = "block";
-};
 window.generateReport = async function () {
-  const t = document.getElementById("rp-output");
+  const t    = document.getElementById("rp-output");
+  const card = document.getElementById("rp-output-card");
   if (!t) return;
   const provider = document.getElementById("rp-provider")?.value || localStorage.getItem("ai_provider") || "groq";
-  const labels = { groq: "Groq · LLaMA 3.3 70B", openai: "ChatGPT · GPT-4o", anthropic: "Claude · Sonnet 4.6" };
+  const labels = { groq: "Groq · LLaMA 3.3 70B", ollama: "Ollama · Local LLM", anthropic: "Claude · Sonnet 4.6" };
+  card.style.display = "block";
   t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating report with ${labels[provider] || provider}…`;
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
   const data = await api.generateReport({
-    name:     document.getElementById("rp-name")?.value,
-    dept:     document.getElementById("rp-dept")?.value,
-    week:     document.getElementById("rp-week")?.value,
-    manager:  document.getElementById("rp-mgr")?.value,
-    source:   document.getElementById("rp-source")?.value,
+    name:      document.getElementById("rp-name")?.value,
+    dept:      document.getElementById("rp-dept")?.value,
+    startTime: document.getElementById("rp-start")?.value,
+    endTime:   document.getElementById("rp-end")?.value,
+    context:   document.getElementById("rp-context")?.value,
     provider,
   });
   typeIn(t, data.text || data.error || "Error generating report");
 };
-window.toggleOAuth = function () {
-  const g = document.getElementById("oauth-steps");
-  if (g) g.style.display = g.style.display === "none" ? "block" : "none";
+window.clearReport = function () {
+  const card = document.getElementById("rp-output-card");
+  const t    = document.getElementById("rp-output");
+  if (t) t.innerHTML = "";
+  if (card) card.style.display = "none";
 };
-window.loginMicrosoft = function () {
-  window.location.href = "/api/auth/microsoft";
-};
-window.testSharePoint = async function () {
-  const s   = document.getElementById("sp-status");
-  const tok = document.getElementById("sp-token")?.value || localStorage.getItem("spToken") || "";
-  if (!s) return;
-  s.style.display = "block";
-  if (!tok) { typeIn(s, "No access token. Click OAuth setup → Login with Microsoft 365."); return; }
-  s.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Testing connection...`;
-  const data = await api.spTest(tok);
-  typeIn(s, data.ok ? `✓ Connected\nUser : ${data.user} (${data.email})\nDrive: ${data.driveType}\nStatus: Ready` : `✗ Failed: ${data.error}`);
-};
-window.exportToSharePoint = async function () {
-  const s       = document.getElementById("sp-status");
+window.downloadReport = function () {
   const content = document.getElementById("rp-output")?.innerText || "";
-  if (!s) return;
-  if (!content || content.includes("Click")) { showToast("Generate a report first, then export."); return; }
-  s.style.display = "block";
-  s.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Building .docx and uploading...`;
-  const data = await api.spExport({
-    token:         document.getElementById("sp-token")?.value || localStorage.getItem("spToken") || "",
-    spUrl:         document.getElementById("sp-url")?.value,
-    filename:      document.getElementById("sp-filename")?.value,
-    source:        document.getElementById("sp-source")?.value,
-    reportContent: content,
-    reportMeta: {
-      name:    document.getElementById("rp-name")?.value,
-      dept:    document.getElementById("rp-dept")?.value,
-      week:    document.getElementById("rp-week")?.value,
-      manager: document.getElementById("rp-mgr")?.value,
-    },
-  });
-  typeIn(s, data.ok
-    ? `✓ Exported!\nFile   : ${data.path || ""}\nURL    : ${data.webUrl || "—"}\nTime   : ${new Date().toLocaleString("en-IN")}`
-    : `✗ Failed: ${data.error}`
-  );
-};
-window.saveKeys = function () {
-  const ak = document.getElementById("cfg-ak")?.value;
-  const ok = document.getElementById("cfg-ok")?.value;
-  if (ak) localStorage.setItem("anthropicKey", ak);
-  if (ok) localStorage.setItem("openaiKey", ok);
-  showToast("API keys saved.");
+  if (!content) return;
+  const name = (document.getElementById("rp-name")?.value || "Report").replace(/\s+/g, "_");
+  const fmt  = document.getElementById("rp-dl-fmt")?.value || "pdf";
+
+  if (fmt === "doc") {
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Weekly Report</title></head><body style="font-family:Calibri,sans-serif;font-size:11pt;line-height:1.6;margin:2cm">${content.replace(/\n/g, "<br>")}</body></html>`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "application/msword" }));
+    a.download = `Weekly_Report_${name}.doc`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } else {
+    const win = window.open("", "_blank");
+    if (!win) { showToast("Allow pop-ups to download PDF."); return; }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Weekly_Report_${name}</title><style>body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.6;margin:2cm 2.5cm;color:#1a1a1a}pre{white-space:pre-wrap;font-family:inherit}@media print{body{margin:1.5cm}}</style></head><body><pre>${content.replace(/</g,"&lt;")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}<\/script></html>`);
+    win.document.close();
+  }
 };
 
 // ── MOM generator ──────────────────────────────────────────────
-window.generateMOM = async function () {
-  const res = document.getElementById("mom-result");
-  const o   = document.getElementById("mom-output");
-  if (res) res.style.display = "block";
-  if (o)   o.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating MOM...`;
-  const data = await api.generateMom({
-    title:      document.getElementById("mm-title")?.value,
-    date:       document.getElementById("mm-date")?.value,
-    attendees:  document.getElementById("mm-att")?.value,
-    facilitator:document.getElementById("mm-fac")?.value,
-    objective:  document.getElementById("mm-obj")?.value,
-    transcript: document.getElementById("mm-transcript")?.value,
-  });
-  if (o) typeIn(o, data.text || data.error);
+// populate the MOM dropdown with this week's meetings
+window.populateMOMDropdown = function () {
+  const sel = document.getElementById("mm-meeting-select");
+  if (!sel) return;
+  const now      = new Date();
+  const weekAgo  = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7); weekAgo.setHours(0, 0, 0, 0);
+  const weekly   = _ewsMeetings
+    .filter(m => { const d = new Date(m.start); return d >= weekAgo && d <= now; })
+    .sort((a, b) => new Date(b.start) - new Date(a.start)); // newest first
+  sel.innerHTML = weekly.length
+    ? `<option value="">— select a meeting —</option>` +
+      weekly.map((m, i) => {
+        const d = new Date(m.start);
+        const label = `${m.subject} — ${isNaN(d) ? m.start : d.toLocaleDateString("en-IN", { weekday:"short", day:"2-digit", month:"short" }) + " at " + d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })}`;
+        const realIdx = _ewsMeetings.indexOf(m);
+        return `<option value="${realIdx}">${label}</option>`;
+      }).join("")
+    : `<option value="">— no meetings found this week (sync calendar first) —</option>`;
+  // reset state
+  const info = document.getElementById("mm-meeting-info"); if (info) info.style.display = "none";
+  const btn  = document.getElementById("mm-gen-btn");      if (btn)  btn.disabled = true;
+  const card = document.getElementById("mm-output-card");  if (card) card.style.display = "none";
 };
-window.clearMOM = function () {
-  ["mm-title","mm-date","mm-att","mm-obj","mm-transcript"].forEach((id) => { const e = document.getElementById(id); if (e) e.value = ""; });
-  const fac = document.getElementById("mm-fac"); if (fac) fac.value = "Aditya S";
-  const res = document.getElementById("mom-result"); if (res) res.style.display = "none";
+window.onMOMSelectChange = function () {
+  const sel  = document.getElementById("mm-meeting-select");
+  const info = document.getElementById("mm-meeting-info");
+  const btn  = document.getElementById("mm-gen-btn");
+  const idx  = parseInt(sel?.value, 10);
+  if (isNaN(idx) || idx < 0) { if (info) info.style.display = "none"; if (btn) btn.disabled = true; return; }
+  const m    = _ewsMeetings[idx];
+  if (!m)    { if (info) info.style.display = "none"; if (btn) btn.disabled = true; return; }
+  const d    = new Date(m.start);
+  const rows = [
+    `<i class="ti ti-calendar" style="font-size:11px"></i> ${isNaN(d) ? m.start : d.toLocaleDateString("en-IN", { weekday:"long", day:"2-digit", month:"long", year:"numeric" }) + (isNaN(d) ? "" : " · " + d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" }))}`,
+    m.dur       ? `<i class="ti ti-clock" style="font-size:11px"></i> ${m.dur}` : "",
+    m.location  ? `<i class="ti ti-map-pin" style="font-size:11px"></i> ${escHtml(m.location)}` : "",
+    m.attendees?.length ? `<i class="ti ti-users" style="font-size:11px"></i> ${escHtml(m.attendees.join(", "))}` : "",
+  ].filter(Boolean);
+  info.innerHTML = rows.join("<br>");
+  info.style.display = "block";
+  btn.disabled = false;
+};
+window.generateMOM = async function () {
+  const sel  = document.getElementById("mm-meeting-select");
+  const card = document.getElementById("mm-output-card");
+  const o    = document.getElementById("mom-output");
+  const idx  = parseInt(sel?.value, 10);
+  const m    = _ewsMeetings[idx];
+  if (!m || !o) return;
+  card.style.display = "block";
+  o.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating MOM…`;
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+  const start = new Date(m.start);
+  const data  = await api.teamsMOM({
+    subject:   m.subject,
+    date:      isNaN(start) ? m.start : start.toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" }),
+    attendees: (m.attendees || []).join(", ") || "Not specified",
+    duration:  m.dur || "N/A",
+    context:   m.location || "",
+  });
+  typeIn(o, data.text || data.error || "Error generating MOM");
+};
+window.downloadMOMDoc = function () {
+  const content = document.getElementById("mom-output")?.innerText || "";
+  if (!content) return;
+  const sel     = document.getElementById("mm-meeting-select");
+  const idx     = parseInt(sel?.value, 10);
+  const title   = (_ewsMeetings[idx]?.subject || "MOM").replace(/\s+/g, "_");
+  const fmt     = document.getElementById("mm-dl-fmt")?.value || "pdf";
+  if (fmt === "doc") {
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Calibri,sans-serif;font-size:11pt;line-height:1.6;margin:2cm">${content.replace(/\n/g, "<br>")}</body></html>`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "application/msword" }));
+    a.download = `${title}.doc`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } else {
+    const win = window.open("", "_blank");
+    if (!win) { showToast("Allow pop-ups to download PDF."); return; }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.6;margin:2cm 2.5cm;color:#1a1a1a}pre{white-space:pre-wrap;font-family:inherit}@media print{body{margin:1.5cm}}</style></head><body><pre>${content.replace(/</g,"&lt;")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}<\/script></html>`);
+    win.document.close();
+  }
 };
 
 // ── Stand-up (with auto-generate + Manager Q&A) ────────────────
@@ -1672,6 +1761,70 @@ function _suRenderSuggestions() {
 }
 
 // ── Leave & Resources ──────────────────────────────────────────
+// ── Team members (leave register) ──────────────────────────────
+const LV_KEY = "teamMembers";
+function lvLoadMembers() { try { return JSON.parse(localStorage.getItem(LV_KEY) || "[]"); } catch { return []; } }
+function lvSaveMembers(arr) { localStorage.setItem(LV_KEY, JSON.stringify(arr)); }
+
+function renderStakeholders() {
+  const tbody  = document.getElementById("stakeholder-tbody");
+  const empty  = document.getElementById("lv-empty-row");
+  if (!tbody) return;
+  const members = lvLoadMembers();
+  // remove all dynamic rows
+  tbody.querySelectorAll("tr.lv-member-row").forEach(r => r.remove());
+  if (empty) empty.style.display = members.length ? "none" : "";
+  members.forEach((m, i) => {
+    const tr = document.createElement("tr");
+    tr.className = "lv-member-row";
+    tr.innerHTML = `<td>${i + 1}</td><td>${escHtml(m.name)}</td><td>${escHtml(m.role)}</td><td><span class="badge b-blue">${escHtml(m.type)}</span></td><td><span class="badge b-green">Available</span></td><td><button class="sm" style="padding:2px 7px" onclick="removeTeamMember(${i})"><i class="ti ti-x" style="font-size:11px"></i></button></td>`;
+    tbody.appendChild(tr);
+  });
+  // update stat cards
+  const avail = document.getElementById("lv-avail-count");
+  const total = document.getElementById("lv-total-sub");
+  if (avail) avail.textContent = members.length;
+  if (total) total.textContent = `of ${members.length} member${members.length !== 1 ? "s" : ""}`;
+}
+
+window.addTeamMember = function () {
+  const name = document.getElementById("lv-new-name")?.value?.trim();
+  const role = document.getElementById("lv-new-role")?.value?.trim();
+  const type = document.getElementById("lv-new-type")?.value || "Full Time";
+  if (!name) { showToast("Enter a name."); return; }
+  const members = lvLoadMembers();
+  members.push({ name, role: role || "—", type });
+  lvSaveMembers(members);
+  document.getElementById("lv-new-name").value = "";
+  document.getElementById("lv-new-role").value = "";
+  renderStakeholders();
+};
+
+window.removeTeamMember = function (i) {
+  const members = lvLoadMembers();
+  members.splice(i, 1);
+  lvSaveMembers(members);
+  renderStakeholders();
+};
+
+// set today as default leave dates and load saved emails
+(function initLeaveForm() {
+  const today = new Date().toISOString().slice(0, 10);
+  const from  = document.getElementById("lv-from");
+  const to    = document.getElementById("lv-to");
+  if (from && !from.value) from.value = today;
+  if (to   && !to.value)   to.value   = today;
+  // restore saved email settings
+  const mgr = localStorage.getItem("lv_mgr_email");
+  const hr  = localStorage.getItem("lv_hr_email");
+  if (mgr) { const el = document.getElementById("lv-to-email"); if (el) el.value = mgr; }
+  if (hr)  { const el = document.getElementById("lv-cc-email");  if (el) el.value = hr; }
+  // persist email changes
+  document.getElementById("lv-to-email")?.addEventListener("change", e => localStorage.setItem("lv_mgr_email", e.target.value));
+  document.getElementById("lv-cc-email")?.addEventListener("change", e => localStorage.setItem("lv_hr_email",  e.target.value));
+  renderStakeholders();
+})();
+
 window.syncLeaveFromExchange = async function (btn) {
   const creds = ewsGetCreds();
   if (!creds.ewsUrl) { showToast("Connect to Exchange in Teams panel first."); return; }
@@ -1727,7 +1880,8 @@ window.generateLeaveEmail = async function () {
   const toEmail   = document.getElementById("lv-to-email")?.value?.trim() || "";
   const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : d;
   const dateRange = fromDate === toDate ? fmt(fromDate) : `${fmt(fromDate)} to ${fmt(toDate)}`;
-  const prompt = `Write a formal, professional ${leaveType.toLowerCase()} request email from Aditya S (System Analyst / Solution Architect, ESDS Software Solution Pvt. Ltd.)` +
+  const senderName = document.getElementById("rp-name")?.value?.trim() || localStorage.getItem("userName") || "Team Member";
+  const prompt = `Write a formal, professional ${leaveType.toLowerCase()} request email from ${senderName} (ESDS Software Solution Pvt. Ltd.)` +
     ` for dates: ${dateRange}.` +
     (reason ? ` Reason: ${reason}.` : "") +
     ` To: ${toEmail || "Manager"}.` +
@@ -1891,7 +2045,16 @@ window.sendChatMessage = async function () {
   msgs.appendChild(thinking);
   msgs.scrollTop = msgs.scrollHeight;
   const data = await api.chat(msg);
-  thinking.innerHTML = `<div class="msg-lbl">Assistant</div>${renderMarkdown(data.text || data.error || "Error")}`;
+  if (data.error) {
+    thinking.innerHTML =
+      `<div class="msg-lbl" style="color:var(--red)">Error</div>` +
+      `<div style="font-size:13px;color:var(--red);margin-bottom:8px">${escHtml(data.error)}</div>` +
+      `<div style="font-size:12px;color:var(--muted)">Switch to a different provider: ` +
+      `<button class="sm" style="font-size:11px" onclick="setAIProvider('groq')">⚡ Groq</button> ` +
+      `<button class="sm" style="font-size:11px;margin-left:4px" onclick="setAIProvider('anthropic')">🧠 Claude</button></div>`;
+  } else {
+    thinking.innerHTML = `<div class="msg-lbl">Assistant</div>${renderMarkdown(data.text || "No response")}`;
+  }
   msgs.scrollTop = msgs.scrollHeight;
 };
 
@@ -1910,14 +2073,34 @@ window.clearChat = function () {
 
 window.setAIProvider = function (provider) {
   localStorage.setItem("ai_provider", provider);
-  // Sync both selectors
-  ["ai-provider-select", "rp-provider"].forEach((id) => {
+  // Sync all provider selectors across panels
+  ["ai-provider-select", "rp-provider", "ov-ai-platform"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = provider;
   });
-  const labels = { groq: "Groq · LLaMA 3.3 70B", openai: "ChatGPT · GPT-4o", anthropic: "Claude · Sonnet 4.6" };
+  const labels = { groq: "Groq · LLaMA 3.3 70B", ollama: "Ollama · Local LLM", anthropic: "Claude · Sonnet 4.6" };
   showToast(`AI model: ${labels[provider] || provider}`);
 };
+
+window.updateProjectName = function (val) {
+  localStorage.setItem("projectName", val || "");
+  const el = document.getElementById("sb-project-name");
+  if (el) { el.textContent = val || ""; el.style.display = val?.trim() ? "block" : "none"; }
+};
+
+// set today as default for the calendar Add Event date field
+(function() { const el = document.getElementById("ev-date"); if (el && !el.value) el.value = new Date().toISOString().slice(0, 10); })();
+
+// ── Restore project name + AI provider on load ─────────────────
+(function initProjectSetup() {
+  const project  = localStorage.getItem("projectName") || "";
+  const provider = localStorage.getItem("ai_provider") || "groq";
+  const projInp  = document.getElementById("ov-project");
+  const aiSel    = document.getElementById("ov-ai-platform");
+  if (projInp) projInp.value = project;
+  if (aiSel)   aiSel.value   = provider;
+  if (project) window.updateProjectName(project);
+})();
 
 // ── Copy / share helpers (used inline from HTML) ───────────────
 window.copyText = copyText;

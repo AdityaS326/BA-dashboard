@@ -52,6 +52,8 @@ export function renderCalendar(events) {
       document.querySelectorAll(".cal-cell").forEach((c) => c.classList.remove("sel"));
       el.classList.add("sel");
       renderSchedule(k, events);
+      const evDate = document.getElementById("ev-date");
+      if (evDate) evDate.value = k;
     };
     cells.appendChild(el);
   }

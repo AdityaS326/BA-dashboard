@@ -85,11 +85,12 @@ export const api = {
   msCalendar: () => get("/api/mscalendar/events", { token: msToken() }),
 
   // Exchange Web Services (on-premise Exchange)
-  ewsMeetings:  (creds)          => post("/api/ews/meetings",    creds),
-  ewsEmails:    (creds)          => post("/api/ews/emails",      creds),
-  ewsEmailBody: (creds)          => post("/api/ews/email-body",  creds),
-  ewsSendEmail: (data)           => post("/api/ews/send-email",  data),
-  ewsDiscover:  (email)          => get("/api/ews/discover",     { email }),
+  ewsMeetings:     (creds) => post("/api/ews/meetings",        creds),
+  ewsEmails:       (creds) => post("/api/ews/emails",           creds),
+  ewsEmailBody:    (creds) => post("/api/ews/email-body",       creds),
+  ewsSendEmail:    (data)  => post("/api/ews/send-email",       data),
+  ewsCreateMeeting:(data)  => post("/api/ews/create-meeting",   data),
+  ewsDiscover:     (email) => get("/api/ews/discover",          { email }),
 
   // Document upload to SharePoint
   uploadDoc: (formData) => {

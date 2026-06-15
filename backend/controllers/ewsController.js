@@ -1,10 +1,8 @@
 // backend/controllers/ewsController.js
-// Uses httpntlm to handle the 3-way NTLM handshake that ESDS Exchange requires.
+// Uses httpntlm to handle the 3-way NTLM handshake required by on-premise Exchange.
 // Also accepts self-signed certs and TLS 1.0 (common on on-premise Exchange).
 
 import httpntlm from "httpntlm";
-
-const EWS_URL = "https://owa.esds.co.in/EWS/Exchange.asmx";
 
 function buildSOAP(startDate, endDate) {
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -102,7 +100,8 @@ export async function getMeetings(req, res) {
     return res.status(400).json({ error: "username and password are required." });
   }
 
-  const url = ewsUrl || EWS_URL;
+  if (!ewsUrl) return res.status(400).json({ error: "Exchange server URL is required." });
+  const url = ewsUrl;
 
   // Split domain\username or use email as-is
   let domain   = "";
@@ -255,7 +254,8 @@ export async function getEmails(req, res) {
   const { ewsUrl, username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "username and password are required." });
 
-  const url  = ewsUrl || EWS_URL;
+  if (!ewsUrl) return res.status(400).json({ error: "Exchange server URL is required." });
+  const url  = ewsUrl;
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
 
@@ -282,7 +282,8 @@ export async function getEmailBody(req, res) {
   const { ewsUrl, username, password, itemId, changeKey } = req.body;
   if (!username || !password || !itemId) return res.status(400).json({ error: "username, password and itemId required." });
 
-  const url  = ewsUrl || EWS_URL;
+  if (!ewsUrl) return res.status(400).json({ error: "Exchange server URL is required." });
+  const url  = ewsUrl;
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
 
@@ -353,7 +354,8 @@ export async function sendEmail(req, res) {
   if (!to)       return res.status(400).json({ error: "Recipient (to) is required." });
   if (!subject)  return res.status(400).json({ error: "Subject is required." });
 
-  const url  = ewsUrl || EWS_URL;
+  if (!ewsUrl) return res.status(400).json({ error: "Exchange server URL is required." });
+  const url  = ewsUrl;
   let domain = "", user = username;
   if (username.includes("\\")) [domain, user] = username.split("\\");
 
@@ -385,7 +387,7 @@ export async function discoverEWS(req, res) {
     return res.status(400).json({ error: "email is required" });
   }
   const domain = email.split("@")[1];
-  // owa.esds.co.in confirmed reachable (HTTP 401 = server exists, auth required)
+  // HTTP 401 = server exists and requires auth — candidate URLs to probe
   const candidates = [
     `https://owa.${domain}/EWS/Exchange.asmx`,
     `https://mail.${domain}/EWS/Exchange.asmx`,
@@ -394,4 +396,82 @@ export async function discoverEWS(req, res) {
     `https://outlook.${domain}/EWS/Exchange.asmx`,
   ];
   res.json({ candidates, domain, recommended: `https://owa.${domain}/EWS/Exchange.asmx` });
+}
+
+// POST /api/ews/create-meeting
+function buildCreateMeetingSOAP(subject, start, end, attendees, body, location) {
+  const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const attXml = (attendees || []).filter(Boolean).map(
+    (a) => `<t:Attendee><t:Mailbox><t:EmailAddress>${esc(a.trim())}</t:EmailAddress></t:Mailbox></t:Attendee>`
+  ).join("");
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+  xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header><t:RequestServerVersion Version="Exchange2013_SP1"/></soap:Header>
+  <soap:Body>
+    <m:CreateItem MessageDisposition="SendAndSaveCopy" SendMeetingInvitations="SendToAllAndSaveCopy">
+      <m:SavedItemFolderId><t:DistinguishedFolderId Id="calendar"/></m:SavedItemFolderId>
+      <m:Items>
+        <t:CalendarItem>
+          <t:Subject>${esc(subject)}</t:Subject>
+          <t:Body BodyType="HTML">${esc(body || `You are invited to: ${subject}`)}</t:Body>
+          <t:Start>${start}</t:Start>
+          <t:End>${end}</t:End>
+          <t:IsAllDayEvent>false</t:IsAllDayEvent>
+          ${location ? `<t:Location>${esc(location)}</t:Location>` : ""}
+          ${attXml ? `<t:RequiredAttendees>${attXml}</t:RequiredAttendees>` : ""}
+        </t:CalendarItem>
+      </m:Items>
+    </m:CreateItem>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+export async function createMeeting(req, res) {
+  const { ewsUrl, username, password, subject, date, time, duration, attendees, location, body } = req.body;
+  if (!username || !password) return res.status(400).json({ error: "Exchange credentials required. Connect in the Teams panel first." });
+  if (!ewsUrl)   return res.status(400).json({ error: "Exchange server URL is required." });
+  if (!subject)  return res.status(400).json({ error: "Meeting title is required." });
+  if (!date)     return res.status(400).json({ error: "Meeting date is required." });
+
+  // Parse date + time → start ISO string
+  const timeMatch = (time || "09:00 AM").match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  let h  = timeMatch ? parseInt(timeMatch[1]) : 9;
+  let mi = timeMatch ? parseInt(timeMatch[2]) : 0;
+  if (timeMatch?.[3]?.toUpperCase() === "PM" && h !== 12) h += 12;
+  if (timeMatch?.[3]?.toUpperCase() === "AM" && h === 12) h = 0;
+
+  const startDate = new Date(`${date}T00:00:00`);
+  startDate.setHours(h, mi, 0, 0);
+  const durMins = parseInt((duration || "30 min").match(/\d+/)?.[0] || "30");
+  const endDate = new Date(startDate.getTime() + durMins * 60000);
+
+  const toISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, "");
+
+  let domain = "", user = username;
+  if (username.includes("\\")) [domain, user] = username.split("\\");
+
+  try {
+    const response = await ntlmPost({
+      url: ewsUrl, username: user, password, domain, workstation: "",
+      body: buildCreateMeetingSOAP(subject, toISO(startDate), toISO(endDate), attendees || [], body, location),
+      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"http://schemas.microsoft.com/exchange/services/2006/messages/CreateItem"' },
+      rejectUnauthorized: false,
+    });
+    if (response.statusCode === 401) return res.status(401).json({ error: "Invalid Exchange credentials." });
+    if (response.statusCode >= 400)  return res.status(response.statusCode).json({ error: `Exchange returned HTTP ${response.statusCode}` });
+    if (response.body.includes("soap:Fault")) {
+      const fault = response.body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i);
+      return res.status(500).json({ error: "Exchange error: " + (fault ? fault[1] : "Unknown") });
+    }
+    res.json({ ok: true, start: toISO(startDate), end: toISO(endDate) });
+  } catch (err) {
+    const msg = err.message || "";
+    if (msg.includes("ENOTFOUND") || msg.includes("ETIMEDOUT"))
+      return res.status(502).json({ error: "Cannot reach Exchange server." });
+    res.status(502).json({ error: msg });
+  }
 }
