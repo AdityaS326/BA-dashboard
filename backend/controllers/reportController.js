@@ -1,41 +1,47 @@
-﻿// backend/controllers/reportController.js
+// backend/controllers/reportController.js
 import { callAI } from "../utils/aiRouter.js";
 
 export async function generateReport(req, res) {
   const {
-    name = "Aditya S",
+    name = "Mahesh Beesu",
     dept = "Technology",
-    week,
-    manager = "Igor (Product Owner)",
-    source = "claude",
+    startTime,
+    endTime,
+    context = "",
     provider = "groq",
   } = req.body;
 
-  const today =
-    week ||
-    new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+  const fmt = (dt) => dt
+    ? new Date(dt).toLocaleString("en-IN", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  const period = fmt(startTime) && fmt(endTime)
+    ? `${fmt(startTime)} to ${fmt(endTime)}`
+    : fmt(startTime) || fmt(endTime)
+      || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+
+  const contextSection = context?.trim()
+    ? `\nKey activities / context provided by the employee:\n${context.trim()}\n`
+    : "";
 
   const prompt = `Generate a formal 9-section Weekly Work Report.
 
 Employee: ${name}
 Department: ${dept}
-Week Ending: ${today}
-Manager: ${manager}
-Source: ${source} AI conversation history
-
+Report Period: ${period}
+${contextSection}
 Sections required:
-SECTION 1 â€” EXECUTIVE SUMMARY (2â€“3 paragraphs)
-SECTION 2 â€” KEY ACCOMPLISHMENTS (5â€“8 bullet points)
-SECTION 3 â€” PROJECTS & TASKS IN PROGRESS
-SECTION 4 â€” MEETINGS & COLLABORATIONS
-SECTION 5 â€” RESEARCH & LEARNING
-SECTION 6 â€” CLIENT & STAKEHOLDER INTERACTIONS
-SECTION 7 â€” CHALLENGES & RESOLUTIONS
-SECTION 8 â€” METRICS & DELIVERABLES
-SECTION 9 â€” PLAN FOR NEXT WEEK (5â€“7 priorities)
+SECTION 1 - EXECUTIVE SUMMARY (2-3 paragraphs)
+SECTION 2 - KEY ACCOMPLISHMENTS (5-8 bullet points)
+SECTION 3 - PROJECTS & TASKS IN PROGRESS
+SECTION 4 - MEETINGS & COLLABORATIONS
+SECTION 5 - RESEARCH & LEARNING
+SECTION 6 - CLIENT & STAKEHOLDER INTERACTIONS
+SECTION 7 - CHALLENGES & RESOLUTIONS
+SECTION 8 - METRICS & DELIVERABLES
+SECTION 9 - PLAN FOR NEXT WEEK (5-7 priorities)
 
-Context: ${name} is a System Analyst / Solution Architect at ESDS Software Solution Pvt. Ltd.
-working on EEL (Enterprise Linux), GPOS Subscription Manager, BRD/FRD documentation, and solution architecture.
+Context: ${name} is a Business Analyst at ESDS Software Solution Pvt. Ltd.
 Use formal third-person tone throughout. Be specific and realistic.`;
 
   try {
@@ -45,10 +51,9 @@ Use formal third-person tone throughout. Be specific and realistic.`;
       4000,
       provider
     );
-    res.json({ text, provider, meta: { name, dept, week: today, manager } });
+    res.json({ text, provider, meta: { name, dept, period } });
   } catch (err) {
     console.error("[reportController]", err.message);
     res.status(502).json({ error: err.message });
   }
 }
-

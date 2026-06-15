@@ -21,7 +21,11 @@
 <nav id="sidebar">
   <div class="sb-brand">
     <div class="sb-logo" style="font-size:17px;line-height:1">🦅</div>
-    <div class="sb-name-wrap"><div class="sb-title">Falcon App</div><div class="sb-sub">v3.0</div></div>
+    <div class="sb-name-wrap">
+      <div class="sb-title">Falcon App</div>
+      <div class="sb-sub">v3.0</div>
+      <div id="sb-project-name" style="display:none;font-size:10px;font-weight:600;color:var(--blue);margin-top:2px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em"></div>
+    </div>
   </div>
   <div class="sb-section">
     <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Overview</span></div>
@@ -132,7 +136,7 @@
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">
           <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
             <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</span>
-            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Enter your Exchange username / email</strong> — your corporate AD account (e.g. username@esds.co.in)</div>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Enter your Exchange username / email</strong> — your corporate AD account (e.g. you@yourcompany.com)</div>
           </div>
           <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
             <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</span>
@@ -146,7 +150,7 @@
 
         <!-- Credentials form -->
         <label>Username / Email</label>
-        <input id="ews-username" placeholder="username@esds.co.in" style="margin-bottom:10px"
+        <input id="ews-username" placeholder="you@yourcompany.com" style="margin-bottom:10px"
           oninput="ewsCheckInputs()">
 
         <label>Password</label>
@@ -160,9 +164,9 @@
             <i class="ti ti-search"></i> Auto-detect
           </button>
         </div>
-        <input id="ews-url" value="https://owa.esds.co.in/EWS/Exchange.asmx"
+        <input id="ews-url"
           style="font-family:var(--mono);font-size:12px;margin-bottom:6px"
-          placeholder="https://owa.yourdomain.com/EWS/Exchange.asmx">
+          placeholder="https://owa.yourcompany.com/EWS/Exchange.asmx">
         <div id="ews-discover-results" style="display:none;margin-bottom:10px"></div>
 
         <div id="ews-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px;padding:8px 10px;background:rgba(220,38,38,.07);border-radius:var(--r-sm)"></div>
@@ -253,6 +257,24 @@
 <!-- ██ OVERVIEW ████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-ov">
   <div id="ov-reminder"></div>
+  <!-- Project + AI platform setup -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-rocket"></i>Project &amp; AI setup</span></div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:160px">
+        <label>Project name</label>
+        <input id="ov-project" placeholder="e.g. EEL v2, GPOS, Customer Portal…" oninput="updateProjectName(this.value)" style="margin-bottom:0">
+      </div>
+      <div style="width:240px">
+        <label>AI platform</label>
+        <select id="ov-ai-platform" style="margin-bottom:0" onchange="setAIProvider(this.value)">
+          <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+          <option value="ollama">🦙 Ollama — Local LLM</option>
+          <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+        </select>
+      </div>
+    </div>
+  </div>
   <!-- Stat cards — all populated dynamically from EWS + DOCS -->
   <div class="g4">
     <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar-event"></i>Meetings today</div><div class="stat-value" id="stat-today-meetings">—</div><div class="stat-sub" id="stat-today-sub">Connect Exchange</div></div>
@@ -304,10 +326,14 @@
       <div class="card">
         <div class="card-hd"><span class="card-title"><i class="ti ti-plus"></i>Add event</span></div>
         <label>Title</label><input id="ev-title" placeholder="EEL Architecture Review">
-        <div class="g2" style="gap:8px;margin-bottom:0"><div><label>Time</label><input id="ev-time" value="10:00 AM"></div><div><label>Duration</label><select id="ev-dur"><option>15 min</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div></div>
-        <label>Attendees</label><input id="ev-att" placeholder="Igor, Vijay, Aditya...">
-        <label>Type</label><select id="ev-type"><option value="meet">Meeting</option><option value="review">Review</option><option value="deadline">Deadline</option><option value="block">Focus block</option></select>
-        <button class="primary" onclick="addEvent()" style="width:100%"><i class="ti ti-calendar-plus"></i> Add to calendar</button>
+        <div class="g2" style="gap:8px"><div><label>Date</label><input type="date" id="ev-date"></div><div><label>Time</label><input id="ev-time" value="10:00 AM"></div></div>
+        <div class="g2" style="gap:8px"><div><label>Duration</label><select id="ev-dur"><option>15 min</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div><div><label>Type</label><select id="ev-type"><option value="meet">Meeting</option><option value="review">Review</option><option value="deadline">Deadline</option><option value="block">Focus block</option></select></div></div>
+        <label>Attendees <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(email addresses for invite)</span></label>
+        <input id="ev-att" placeholder="vijay@company.com, aditya@company.com…">
+        <label>Location <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input id="ev-location" placeholder="Conference Room / Teams link">
+        <button class="primary" id="ev-add-btn" onclick="addEvent()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px"><i class="ti ti-send"></i> Add &amp; Send Invite</button>
+        <div id="ev-invite-status" style="display:none;margin-top:8px;font-size:12px;padding:8px 10px;border-radius:var(--r-sm)"></div>
       </div>
     </div>
     <div class="card">
@@ -408,102 +434,71 @@
 
 <!-- ██ WEEKLY REPORT ███████████████████████████████████████████████████████ -->
 <div class="panel" id="p-wr">
-  <div class="seg">
-    <button class="on" onclick="wrTab(this,'gen')">Generate</button>
-    <button onclick="wrTab(this,'sp')">SharePoint export</button>
-    <button onclick="wrTab(this,'cfg')">Settings</button>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch">
+    <!-- Reporter details -->
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-user"></i>Reporter details</span></div>
+      <label>Name</label><input id="rp-name" value="Mahesh Beesu">
+      <label>Department</label><input id="rp-dept" value="Technology">
+      <label>Start time</label><input type="datetime-local" id="rp-start">
+      <label>End time</label><input type="datetime-local" id="rp-end">
+    </div>
+    <!-- AI + context -->
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-robot"></i>AI</span></div>
+      <label>Which AI to use</label>
+      <select id="rp-provider" style="margin-bottom:12px" onchange="localStorage.setItem('ai_provider',this.value)">
+        <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+        <option value="ollama">🦙 Ollama — Local LLM</option>
+        <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+      </select>
+      <label>Additional context <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional — what you worked on, key achievements…)</span></label>
+      <textarea id="rp-context" rows="3" placeholder="e.g. Completed BRD for EEL v2, attended sprint review, resolved GPOS subscription bug..." style="width:100%;resize:vertical;flex:1;min-height:72px;margin-bottom:12px"></textarea>
+      <button class="primary" style="margin-top:auto" onclick="generateReport()"><i class="ti ti-bolt"></i> Generate report</button>
+    </div>
   </div>
-  <div id="wr-gen">
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><span class="card-title"><i class="ti ti-user"></i>Report details</span></div>
-        <label>Name</label><input id="rp-name" value="Aditya S">
-        <label>Department</label><input id="rp-dept" value="Technology">
-        <label>Week ending</label><input type="date" id="rp-week" value="2026-06-09">
-        <label>Manager</label><input id="rp-mgr" value="Igor (Product Owner)">
-      </div>
-      <div class="card">
-        <div class="card-hd"><span class="card-title"><i class="ti ti-settings"></i>Options</span></div>
-        <label>AI model</label>
-        <select id="rp-provider" style="margin-bottom:10px" onchange="localStorage.setItem('ai_provider',this.value)">
-          <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
-          <option value="openai">🤖 ChatGPT — GPT-4o</option>
-          <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+
+  <!-- Output section — hidden until report is generated -->
+  <div class="card" id="rp-output-card" style="display:none">
+    <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span class="card-title" style="flex-shrink:0"><i class="ti ti-file-text"></i>Weekly report</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="sm" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="clearReport()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button>
+        <select id="rp-dl-fmt" style="font-size:12px;padding:0 8px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text)">
+          <option value="pdf">PDF</option>
+          <option value="doc">Word (.doc)</option>
         </select>
-        <label>History source</label>
-        <select id="rp-source" style="margin-bottom:10px"><option value="claude">Claude history (7 days)</option><option value="chatgpt">ChatGPT history (7 days)</option><option value="both">Combined — Claude + ChatGPT</option></select>
-        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
-          <label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text);margin:0;cursor:pointer"><input type="checkbox" checked style="width:auto;margin:0;cursor:pointer"> Executive summary</label>
-          <label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text);margin:0;cursor:pointer"><input type="checkbox" checked style="width:auto;margin:0;cursor:pointer"> Key accomplishments</label>
-          <label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text);margin:0;cursor:pointer"><input type="checkbox" checked style="width:auto;margin:0;cursor:pointer"> Projects in progress</label>
-          <label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text);margin:0;cursor:pointer"><input type="checkbox" checked style="width:auto;margin:0;cursor:pointer"> Plan for next week</label>
-        </div>
-        <button class="primary" onclick="generateReport()"><i class="ti ti-bolt"></i> Generate report</button>
+        <button class="sm primary" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="downloadReport()"><i class="ti ti-download" style="font-size:12px"></i> Download</button>
       </div>
     </div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title"><i class="ti ti-file-text"></i>Report output</span><div style="display:flex;gap:5px"><button class="sm" onclick="copyText('rp-output')"><i class="ti ti-copy" style="font-size:12px"></i></button><button class="sm"><i class="ti ti-download" style="font-size:12px"></i></button></div></div>
-      <div class="term" id="rp-output">Click "Generate report" to pull AI history and build your formal 9-section weekly report...</div>
-    </div>
-  </div>
-  <div id="wr-sp" style="display:none">
-    <div class="card">
-      <div class="card-hd"><span class="card-title"><i class="ti ti-cloud-upload"></i>SharePoint / OneDrive export</span></div>
-      <label>Folder URL <span style="color:var(--hint);font-weight:400">(customise to any SharePoint or OneDrive folder)</span></label>
-      <input id="sp-url" value="https://esdscorp-my.sharepoint.com/personal/pms_esds_co_in/..." style="font-family:var(--mono);font-size:12px">
-      <div class="g2" style="gap:8px">
-        <div><label>Filename</label><input id="sp-filename" value="Weekly_Report_Aditya_S_W24_2026.docx"></div>
-        <div><label>Source</label><select id="sp-source"><option value="both" selected>Claude + ChatGPT</option><option value="claude">Claude only</option><option value="chatgpt">ChatGPT only</option></select></div>
-      </div>
-      <label>Access token</label>
-      <input type="password" id="sp-token" placeholder="Bearer eyJ... — login below to auto-fill" style="font-family:var(--mono);font-size:12px">
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:var(--muted);margin-bottom:10px">
-        How it works: Report generated → Server builds .docx → Uploaded via Microsoft Graph API → File link returned
-      </div>
-      <div class="btn-row">
-        <button class="primary" onclick="exportToSharePoint()"><i class="ti ti-cloud-upload"></i> Export to SharePoint</button>
-        <button onclick="testSharePoint()"><i class="ti ti-link"></i> Test connection</button>
-        <button onclick="toggleOAuth()"><i class="ti ti-key"></i> OAuth setup</button>
-      </div>
-      <div class="term" id="sp-status" style="display:none"></div>
-      <div id="oauth-steps" style="display:none;margin-top:12px">
-        <div style="display:flex;flex-direction:column;gap:7px">
-          <div style="padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--muted);display:flex;gap:8px"><span style="width:18px;height:18px;background:var(--blue-bg);color:var(--blue-text);border-radius:50%;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span><div><strong style="color:var(--text)">Register Azure app</strong> — portal.azure.com → AAD → App registrations. Redirect URI: <code style="font-family:var(--mono);color:var(--blue)">your-vercel-url/api/sharepoint/callback</code></div></div>
-          <div style="padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--muted);display:flex;gap:8px"><span style="width:18px;height:18px;background:var(--blue-bg);color:var(--blue-text);border-radius:50%;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span><div><strong style="color:var(--text)">Add Graph permissions</strong> — <code style="font-family:var(--mono);color:var(--blue)">Files.ReadWrite.All</code> · <code style="font-family:var(--mono);color:var(--blue)">Sites.ReadWrite.All</code> · <code style="font-family:var(--mono);color:var(--blue)">User.Read</code></div></div>
-          <div style="padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--muted);display:flex;gap:8px"><span style="width:18px;height:18px;background:var(--blue-bg);color:var(--blue-text);border-radius:50%;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span><div><strong style="color:var(--text)">Set Vercel env vars</strong> — <code style="font-family:var(--mono);color:var(--blue)">SP_TENANT_ID</code> · <code style="font-family:var(--mono);color:var(--blue)">SP_CLIENT_ID</code> · <code style="font-family:var(--mono);color:var(--blue)">SP_CLIENT_SECRET</code></div></div>
-          <button class="primary sm" onclick="loginMicrosoft()"><i class="ti ti-brand-office"></i> Login with Microsoft 365</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="wr-cfg" style="display:none">
-    <div class="g2">
-      <div class="card"><div class="card-hd"><span class="card-title"><i class="ti ti-key"></i>API keys</span></div><label>Anthropic API key</label><input type="password" id="cfg-ak" placeholder="sk-ant-..."><label>OpenAI API key</label><input type="password" id="cfg-ok" placeholder="sk-..."><button class="primary" onclick="saveKeys()"><i class="ti ti-device-floppy"></i> Save keys</button></div>
-      <div class="card"><div class="card-hd"><span class="card-title"><i class="ti ti-settings"></i>Format</span></div><label>Tone</label><select><option>Formal · third-person</option><option>Professional · first-person</option></select><label>Language</label><select><option>English</option><option>Hindi</option></select></div>
-    </div>
+    <div class="term" id="rp-output" style="max-height:520px"></div>
   </div>
 </div>
 
 <!-- ██ MOM ████████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-mm">
-  <div class="g2">
-    <div class="card">
-      <div class="card-hd"><span class="card-title"><i class="ti ti-clipboard"></i>Meeting details</span></div>
-      <label>Title</label><input id="mm-title" placeholder="EEL Architecture Review">
-      <label>Date & time</label><input id="mm-date" placeholder="09 June 2026 · 10:00 AM">
-      <label>Attendees</label><input id="mm-att" placeholder="Igor, Vijay, Aditya, Tushar">
-      <label>Facilitator</label><input id="mm-fac" value="Aditya S">
-      <label>Objective</label><textarea id="mm-obj" placeholder="Purpose of the meeting..."></textarea>
-      <div class="btn-row"><button class="primary" onclick="generateMOM()"><i class="ti ti-bolt"></i> Generate MOM</button><button onclick="clearMOM()"><i class="ti ti-trash"></i> Clear</button></div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title"><i class="ti ti-microphone"></i>Transcript / notes</span></div>
-      <textarea id="mm-transcript" style="min-height:140px" placeholder="Paste meeting transcript or bullet notes. AI extracts discussion points, decisions, and action items..."></textarea>
-      <div id="mom-result" style="display:none">
-        <div class="term" id="mom-output" style="min-height:70px"></div>
-        <div class="btn-row"><button onclick="copyText('mom-output')"><i class="ti ti-copy"></i> Copy</button><button><i class="ti ti-download"></i> Download</button><button onclick="sendPrompt('Format this MOM as a formal email to all attendees ↗')">Email ↗</button></div>
+  <div class="card">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-clipboard"></i>MOM Generator</span></div>
+    <label>Select a meeting from this week</label>
+    <select id="mm-meeting-select" style="margin-bottom:10px" onchange="onMOMSelectChange()">
+      <option value="">— sync calendar to load meetings —</option>
+    </select>
+    <div id="mm-meeting-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.8"></div>
+    <button class="primary" id="mm-gen-btn" onclick="generateMOM()" disabled><i class="ti ti-bolt"></i> Generate MOM</button>
+  </div>
+  <div class="card" id="mm-output-card" style="display:none">
+    <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span class="card-title" style="flex-shrink:0"><i class="ti ti-file-text"></i>Minutes of Meeting</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="sm" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="copyText('mom-output')"><i class="ti ti-copy" style="font-size:12px"></i> Copy</button>
+        <select id="mm-dl-fmt" style="font-size:12px;padding:0 8px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text)">
+          <option value="pdf">PDF</option>
+          <option value="doc">Word (.doc)</option>
+        </select>
+        <button class="sm primary" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="downloadMOMDoc()"><i class="ti ti-download" style="font-size:12px"></i> Download</button>
       </div>
     </div>
+    <div class="term" id="mom-output" style="max-height:520px"></div>
   </div>
 </div>
 
@@ -530,11 +525,13 @@
       <span class="card-title"><i class="ti ti-messages"></i>Manager Q&amp;A</span>
       <span style="font-size:12px;color:var(--muted)">Simulate questions your manager might ask</span>
     </div>
-    <div id="su-qa-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
-    <div id="su-qa-history" class="chat-msgs" style="max-height:320px;margin-bottom:10px"></div>
-    <div style="display:flex;gap:8px;align-items:flex-start">
-      <textarea id="su-qa-input" placeholder="Type a manager question and get an AI-crafted answer..." style="flex:1;min-height:56px;resize:vertical;margin:0" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();standupQA()}"></textarea>
-      <button class="primary" onclick="standupQA()" style="flex-shrink:0;height:56px;padding:0 14px"><i class="ti ti-send"></i> Answer</button>
+    <div id="su-qa-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <div id="su-qa-history" class="chat-msgs" style="max-height:320px;margin-bottom:12px"></div>
+    <div style="display:flex;align-items:center;gap:0;border:1.5px solid var(--blue);border-radius:999px;background:var(--surface);overflow:hidden;padding:0 4px 0 14px">
+      <i class="ti ti-search" style="color:var(--muted);font-size:15px;flex-shrink:0;margin-right:8px"></i>
+      <input id="su-qa-input" type="text" placeholder="Ask a manager question…" style="flex:1;border:none;background:transparent;outline:none;font-size:13px;height:42px;color:var(--text);padding:0" onkeydown="if(event.key==='Enter'){event.preventDefault();standupQA()}">
+      <span style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.04em;padding:0 10px;border-right:1px solid var(--border);margin-right:4px;white-space:nowrap">⚡ Groq</span>
+      <button class="primary" onclick="standupQA()" style="height:34px;padding:0 16px;border-radius:999px;font-size:13px;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-send" style="font-size:13px"></i> Answer</button>
     </div>
   </div>
 </div>
@@ -577,32 +574,32 @@
 <!-- ██ LEAVE ████████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-lv">
   <div class="g4">
-    <div class="stat-card green"><div class="stat-label"><i class="ti ti-users"></i>Available today</div><div class="stat-value" id="lv-avail-count">7</div><div class="stat-sub">of 7 members</div></div>
+    <div class="stat-card green"><div class="stat-label"><i class="ti ti-users"></i>Available today</div><div class="stat-value" id="lv-avail-count">0</div><div class="stat-sub" id="lv-total-sub">of 0 members</div></div>
     <div class="stat-card amber"><div class="stat-label"><i class="ti ti-beach"></i>On leave</div><div class="stat-value" id="lv-leave-count">0</div><div class="stat-sub" id="lv-leave-names">—</div></div>
     <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar"></i>Planned leaves</div><div class="stat-value" id="lv-planned-count">0</div><div class="stat-sub">Next 2 weeks</div></div>
-    <div class="stat-card red"><div class="stat-label"><i class="ti ti-alert-circle"></i>Unplanned</div><div class="stat-value">0</div></div>
+    <div class="stat-card red"><div class="stat-label"><i class="ti ti-alert-circle"></i>Unplanned</div><div class="stat-value" id="lv-unplanned-count">0</div></div>
   </div>
   <div class="g2">
     <div>
-      <!-- EEL Stakeholder Register -->
       <div class="card" style="margin-bottom:12px">
         <div class="card-hd">
-          <span class="card-title"><i class="ti ti-users"></i>EEL Stakeholder Register</span>
+          <span class="card-title"><i class="ti ti-users"></i>Team members</span>
           <button class="sm" onclick="syncLeaveFromExchange(this)"><i class="ti ti-refresh"></i> Sync from Exchange</button>
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Type</th><th>Status</th></tr></thead>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Type</th><th>Status</th><th></th></tr></thead>
             <tbody id="stakeholder-tbody">
-              <tr><td>2</td><td>Vijay Baskar</td><td>Project Manager</td><td><span class="badge b-blue">Full Time</span></td><td id="st-vijay"><span class="badge b-green">Available</span></td></tr>
-              <tr><td>3</td><td>Aditya S</td><td>System Analyst</td><td><span class="badge b-blue">Full Time</span></td><td id="st-aditya"><span class="badge b-green">Available</span></td></tr>
-              <tr><td>4</td><td>Sajiv Nair</td><td>CTO</td><td><span class="badge b-blue">Full Time</span></td><td id="st-sajiv"><span class="badge b-green">Available</span></td></tr>
-              <tr><td>5</td><td>Tushar</td><td>Technical Guidance</td><td><span class="badge b-blue">Full Time</span></td><td id="st-tushar"><span class="badge b-green">Available</span></td></tr>
-              <tr><td>6</td><td>Swapnil</td><td>Testing</td><td><span class="badge b-blue">Full Time</span></td><td id="st-swapnil"><span class="badge b-green">Available</span></td></tr>
-              <tr><td>7</td><td>Devesh</td><td>Developer</td><td><span class="badge b-blue">Full Time</span></td><td id="st-devesh"><span class="badge b-green">Available</span></td></tr>
-              <tr><td>8</td><td>Priyansh</td><td>Developer</td><td><span class="badge b-blue">Full Time</span></td><td id="st-priyansh"><span class="badge b-green">Available</span></td></tr>
+              <tr id="lv-empty-row"><td colspan="6" style="text-align:center;color:var(--muted);padding:16px;font-size:12px">No members yet — add one below.</td></tr>
             </tbody>
           </table>
+        </div>
+        <!-- Add member form -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:110px"><label style="font-size:11px;margin-bottom:3px;display:block">Name</label><input id="lv-new-name" placeholder="Full name" style="margin:0"></div>
+          <div style="flex:1;min-width:110px"><label style="font-size:11px;margin-bottom:3px;display:block">Role</label><input id="lv-new-role" placeholder="e.g. Developer" style="margin:0"></div>
+          <div style="width:120px"><label style="font-size:11px;margin-bottom:3px;display:block">Type</label><select id="lv-new-type" style="margin:0"><option>Full Time</option><option>Part Time</option><option>Contractor</option></select></div>
+          <button class="sm primary" style="height:34px;flex-shrink:0" onclick="addTeamMember()"><i class="ti ti-plus"></i> Add</button>
         </div>
         <div id="lv-sync-status" style="display:none;font-size:12px;color:var(--muted);margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--r-sm)"></div>
       </div>
@@ -610,10 +607,10 @@
     <div class="card">
       <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-plus"></i>Apply for leave</span></div>
       <label>Leave type</label><select id="lv-type"><option>Planned leave</option><option>Sick leave</option><option>Work from home</option><option>Half day</option></select>
-      <div class="g2" style="gap:8px"><div><label>From date</label><input type="date" id="lv-from" value="2026-06-19"></div><div><label>To date</label><input type="date" id="lv-to" value="2026-06-19"></div></div>
+      <div class="g2" style="gap:8px"><div><label>From date</label><input type="date" id="lv-from"></div><div><label>To date</label><input type="date" id="lv-to"></div></div>
       <label>Reason</label><textarea id="lv-reason" style="min-height:50px" placeholder="Brief reason for leave..."></textarea>
-      <label>To (Manager email)</label><input type="email" id="lv-to-email" placeholder="vijay.baskar@esds.co.in" value="vijay.baskar@esds.co.in">
-      <label>CC (HR email)</label><input type="email" id="lv-cc-email" placeholder="hr@esds.co.in" value="hr@esds.co.in">
+      <label>To (Manager email)</label><input type="email" id="lv-to-email" placeholder="manager@company.com">
+      <label>CC (HR email)</label><input type="email" id="lv-cc-email" placeholder="hr@company.com">
       <div class="btn-row"><button class="primary" onclick="generateLeaveEmail()"><i class="ti ti-mail"></i> Generate email</button><button onclick="sendLeaveEmail(this)"><i class="ti ti-send"></i> Send via Outlook</button></div>
       <div id="lv-email-controls" style="display:none;margin-top:6px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
@@ -668,14 +665,14 @@
       <span class="card-title"><i class="ti ti-message-dots"></i>General assistant</span>
       <select id="ai-provider-select" onchange="setAIProvider(this.value)" style="width:auto;font-size:11px;margin:0;padding:3px 8px;border-radius:var(--r-sm)">
         <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
-        <option value="openai">🤖 ChatGPT — GPT-4o</option>
+        <option value="ollama">🦙 Ollama — Local LLM</option>
         <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
       </select>
       <button class="sm" onclick="clearChat()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button>
     </div>
     <div class="chat-wrap">
       <div class="chat-msgs" id="chat-messages">
-        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi Aditya! I can help with BRDs, user stories, emails, risk analysis, RTMs, stakeholder mapping, and any BA task. I give detailed, structured responses. What would you like to work on?</div>
+        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi Mahesh! I can help with BRDs, user stories, emails, risk analysis, RTMs, stakeholder mapping, and any BA task. I give detailed, structured responses. What would you like to work on?</div>
       </div>
       <div class="chat-inp" style="position:relative">
         <div style="position:relative;flex:1">

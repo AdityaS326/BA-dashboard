@@ -3,7 +3,7 @@
 // Falls back to Groq if an API key is missing for the requested provider.
 
 import { callGroq }   from "./groq.js";
-import { callOpenAI } from "./openai.js";
+import { callOllama } from "./ollama.js";
 import { callClaude } from "./anthropic.js";
 import { config }     from "../config/index.js";
 
@@ -11,19 +11,19 @@ import { config }     from "../config/index.js";
  * @param {string} prompt
  * @param {string} system
  * @param {number} maxTokens
- * @param {"groq"|"openai"|"anthropic"} provider
+ * @param {"groq"|"ollama"|"anthropic"} provider
  */
 export async function callAI(prompt, system, maxTokens = 4000, provider = "groq") {
   switch (provider) {
-    case "openai":
-      if (!config.openaiApiKey) throw new Error("OPENAI_API_KEY is not set. Add it to your .env file.");
-      return callOpenAI(prompt, system, maxTokens);
+    case "ollama":
+      return callOllama(prompt, system, maxTokens);
 
     case "anthropic":
-      if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY is not set. Add it to your .env file.");
-      return callClaude(prompt, system, maxTokens);
+      if (config.anthropicApiKey) return callClaude(prompt, system, maxTokens);
+      console.warn("[aiRouter] ANTHROPIC_API_KEY not set, falling back to Groq");
+      // fall through to groq
 
-    default: // "groq" or anything unknown
+    default: // "groq" or fallback
       if (!config.groqApiKey) throw new Error("GROQ_API_KEY is not set. Add it to your .env file.");
       return callGroq(prompt, system, maxTokens);
   }
