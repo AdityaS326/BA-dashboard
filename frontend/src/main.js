@@ -457,7 +457,10 @@ window.uploadDocFromForm = async function (btn) {
   const token = localStorage.getItem("spToken") || "";
   if (!token) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-upload"></i> Upload'; }
-    if (statusEl) statusEl.textContent = "Saved locally — no SharePoint token. Connect Microsoft 365 in Weekly Report → Settings to upload.";
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.innerHTML = `<i class="ti ti-alert-circle" style="color:var(--orange);margin-right:4px"></i>Microsoft 365 not connected — <a href="/api/auth/microsoft" style="color:#0078d4;font-weight:600;text-decoration:none">Connect now</a> to upload to SharePoint.`;
+    }
     return;
   }
 
@@ -470,20 +473,21 @@ window.uploadDocFromForm = async function (btn) {
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-upload"></i> Upload'; }
 
   if (data.error) {
-    if (statusEl) statusEl.textContent = "Upload failed: " + data.error;
-    showToast("Upload failed: " + data.error);
+    if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = "Upload failed: " + data.error; }
+    showToast("Upload failed: " + data.error, 4000);
     return;
   }
 
   DOCS[0].url = data.url || "";
   DOCS[0].s   = "Approved";
+  try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
   filterDocs();
 
   // Reset form
   fileInput.value = "";
   const lbl = document.getElementById("dc-file-name");
   if (lbl) lbl.textContent = "Choose file (.pdf / .docx)";
-  if (statusEl) statusEl.textContent = `Uploaded: ${data.name} → ${path}`;
+  if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = `Uploaded: ${data.name} → ${path}`; }
   showToast(`Uploaded: ${data.name}`);
 };
 
@@ -704,15 +708,17 @@ function getMsToken() {
   return localStorage.getItem("spToken") || "";
 }
 function updateTokenUI() {
-  const tok    = getMsToken();
-  const badge  = document.getElementById("tm-connected-badge");
-  const hint   = document.getElementById("ol-token-hint");
-  const ok     = document.getElementById("ol-token-ok");
-  const inp    = document.getElementById("ms-token-input");
-  if (badge) badge.style.display = tok ? "inline-flex" : "none";
-  if (hint)  hint.style.display  = tok ? "none"        : "inline";
-  if (ok)    ok.style.display    = tok ? "inline"      : "none";
+  const tok         = getMsToken();
+  const badge       = document.getElementById("tm-connected-badge");
+  const hint        = document.getElementById("ol-token-hint");
+  const ok          = document.getElementById("ol-token-ok");
+  const inp         = document.getElementById("ms-token-input");
+  const dcHint      = document.getElementById("dc-connect-hint");
+  if (badge)  badge.style.display  = tok ? "inline-flex" : "none";
+  if (hint)   hint.style.display   = tok ? "none"        : "inline";
+  if (ok)     ok.style.display     = tok ? "inline"      : "none";
   if (inp && !inp.value && tok)  inp.value = tok;
+  if (dcHint) dcHint.style.display = tok ? "none"        : "block";
 }
 window.connectMsToken = function () {
   const val = document.getElementById("ms-token-input")?.value?.trim();

@@ -154,9 +154,13 @@
           oninput="ewsCheckInputs()">
 
         <label>Password</label>
-        <input id="ews-password" type="password" placeholder="Your Active Directory password" style="margin-bottom:10px"
-          oninput="ewsCheckInputs()"
-          onkeydown="if(event.key==='Enter' && !document.getElementById('ews-connect-btn').disabled) ewsConnect(document.getElementById('ews-connect-btn'))">
+        <div style="position:relative;margin-bottom:10px">
+          <input id="ews-password" type="password" placeholder="Your Active Directory password"
+            style="margin-bottom:0;padding-right:40px;width:100%;box-sizing:border-box"
+            oninput="ewsCheckInputs()"
+            onkeydown="if(event.key==='Enter' && !document.getElementById('ews-connect-btn').disabled) ewsConnect(document.getElementById('ews-connect-btn'))">
+          <button type="button" onclick="(function(){var i=document.getElementById('ews-password');var b=document.getElementById('ews-pw-eye');i.type=i.type==='password'?'text':'password';b.className='ti '+(i.type==='password'?'ti-eye':'ti-eye-off')})()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:0;line-height:1"><i id="ews-pw-eye" class="ti ti-eye"></i></button>
+        </div>
 
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
           <label style="margin:0;flex:1">Exchange server URL</label>
@@ -603,13 +607,21 @@
 
     <div id="sp-sync-status" style="display:none;font-size:12px;padding:7px 10px;border-radius:var(--r-sm);margin-bottom:4px"></div>
 
+    <!-- Inline M365 connect notice (shown when no token) -->
+    <div id="dc-connect-hint" style="display:none;background:rgba(0,120,212,.07);border:1px solid rgba(0,120,212,.22);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--muted)">
+      <i class="ti ti-info-circle" style="color:#0078d4;margin-right:5px"></i>
+      Microsoft 365 not connected —
+      <a href="/api/auth/microsoft" style="color:#0078d4;font-weight:600;text-decoration:none">Connect now</a>
+      to upload directly to SharePoint.
+    </div>
+
     <!-- Upload row -->
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
       <label id="dc-file-lbl" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text);flex-shrink:0;white-space:nowrap">
         <i class="ti ti-file-plus"></i><span id="dc-file-name">Choose file (.pdf / .docx)</span>
         <input type="file" id="dc-file-input" accept=".pdf,.doc,.docx" style="display:none" onchange="onDocFileChosen(this)">
       </label>
-      <input id="dc-upload-path" placeholder="SharePoint folder path e.g. Documents/BA Hub" style="flex:1;margin:0;min-width:180px;font-size:12px">
+      <input id="dc-upload-path" placeholder="SharePoint folder URL or path e.g. Documents/BA Hub" style="flex:1;margin:0;min-width:180px;font-size:12px">
       <button class="sm" onclick="uploadDocFromForm(this)" style="flex-shrink:0"><i class="ti ti-upload"></i> Upload</button>
     </div>
     <div id="dc-upload-status" style="display:none;font-size:12px;margin-top:8px;color:var(--muted)"></div>
