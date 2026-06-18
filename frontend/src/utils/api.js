@@ -53,7 +53,16 @@ async function post(endpoint, body) {
 
 export const api = {
   // General assistant chat — pass provider so backend routes to correct AI
-  chat: (prompt, system, provider) => post("/api/claude", { prompt, system, provider: provider || localStorage.getItem("ai_provider") || "groq" }),
+  chat: (prompt, system, provider, ctx = {}) => post("/api/claude", {
+    prompt,
+    system,
+    projectName: localStorage.getItem("projectName") || "",
+    provider: provider || localStorage.getItem("ai_provider") || "groq",
+    userName:    ctx.userName    || "",
+    userRole:    ctx.userRole    || "",
+    recentWork:  ctx.recentWork  || "",
+    currentPlan: ctx.currentPlan || "",
+  }),
 
   // Weekly report generation
   generateReport: (data) => post("/api/report", { ...data, provider: data.provider || localStorage.getItem("ai_provider") || "groq" }),
@@ -101,6 +110,9 @@ export const api = {
   ewsSendEmail:    (data)  => post("/api/ews/send-email",       data),
   ewsCreateMeeting:(data)  => post("/api/ews/create-meeting",   data),
   ewsDiscover:     (email) => get("/api/ews/discover",          { email }),
+
+  teamMembers:     ()        => get("/api/team-members"),
+  saveTeamMembers: (members) => post("/api/team-members", { members }),
 
   // Document upload to SharePoint
   uploadDoc: (formData) => {
