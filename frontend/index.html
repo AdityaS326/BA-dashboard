@@ -541,15 +541,15 @@
   <div class="g2">
     <div class="card">
       <div class="card-hd"><span class="card-title"><i class="ti ti-pencil"></i>Your input</span></div>
-      <label>Yesterday completed</label><textarea id="su-done" placeholder="What did you complete yesterday?"></textarea>
-      <label>Today's plan</label><textarea id="su-today" placeholder="What are you working on today?"></textarea>
-      <label>Blockers</label><input id="su-blockers" placeholder="Any blockers or dependencies?">
-      <label>Format</label><select id="su-format"><option>Bullet points (Teams/Slack)</option><option>Structured paragraph</option><option>Formal email to manager</option><option>JIRA comment</option></select>
+      <label>Yesterday completed</label><textarea id="su-done" placeholder="What did you complete or work on yesterday?"></textarea>
+      <label>Today's plan</label><textarea id="su-today" placeholder="What are you focusing on today?"></textarea>
+      <label>Blockers <span style="font-weight:400;color:var(--hint)">(optional)</span></label><input id="su-blockers" placeholder="Any blockers or dependencies?">
+      <label>Tone</label><select id="su-format"><option value="casual">Casual — conversational (recommended)</option><option value="professional">Professional — polished but natural</option></select>
       <div class="btn-row"><button class="primary" onclick="generateStandup()"><i class="ti ti-bolt"></i> Generate</button><button onclick="loadYesterday()">Load yesterday</button></div>
     </div>
     <div class="card">
       <div class="card-hd"><span class="card-title"><i class="ti ti-send"></i>Output</span><div style="display:flex;gap:5px"><button class="sm" onclick="copyText('su-output')"><i class="ti ti-copy" style="font-size:12px"></i></button><button class="sm"><i class="ti ti-device-desktop" style="font-size:12px"></i></button></div></div>
-      <div class="term" id="su-output" style="min-height:230px">Fill in the form on the left and click Generate...</div>
+      <div class="term" id="su-output" style="min-height:230px;font-family:var(--font);font-size:14px;line-height:1.75;white-space:pre-wrap">Fill in what you did yesterday and what you're doing today, then click Generate ⚡</div>
     </div>
   </div>
 
@@ -685,7 +685,11 @@
       <label>Reason</label><textarea id="lv-reason" style="min-height:50px" placeholder="Brief reason for leave..."></textarea>
       <label>To (Manager email)</label><input type="email" id="lv-to-email" placeholder="manager@company.com">
       <label>CC (HR email)</label><input type="email" id="lv-cc-email" placeholder="hr@company.com">
-      <div class="btn-row"><button class="primary" onclick="generateLeaveEmail()"><i class="ti ti-mail"></i> Generate email</button><button onclick="sendLeaveEmail(this)"><i class="ti ti-send"></i> Send via Outlook</button></div>
+      <div class="btn-row">
+  <button class="primary" onclick="applyLeave()"><i class="ti ti-calendar-check"></i> Apply Leave</button>
+  <button onclick="generateLeaveEmail()"><i class="ti ti-mail"></i> Generate email</button>
+  <button onclick="sendLeaveEmail(this)"><i class="ti ti-send"></i> Send via Outlook</button>
+</div>
       <div id="lv-email-controls" style="display:none;margin-top:6px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
           <span style="font-size:11px;color:var(--muted)"><i class="ti ti-pencil" style="font-size:10px"></i> Click the text below to edit manually</span>
@@ -774,7 +778,7 @@
     </div>
     <div class="chat-wrap">
       <div class="chat-msgs" id="chat-messages">
-        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi Mahesh! I can help with BRDs, user stories, emails, risk analysis, RTMs, stakeholder mapping, and any BA task. I give detailed, structured responses. What would you like to work on?</div>
+        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi! How can I help you today?</div>
       </div>
       <div class="chat-inp" style="position:relative">
         <div style="position:relative;flex:1">
@@ -784,16 +788,6 @@
         <button class="primary" onclick="sendChatMessage()" aria-label="Send"><i class="ti ti-send"></i></button>
       </div>
     </div>
-  </div>
-  <div style="font-size:12px;color:var(--muted);margin-bottom:7px">Quick prompts</div>
-  <div class="quick-prompts">
-    <button onclick="quickChat('Write 5 user stories for EEL subscription management')">User stories</button>
-    <button onclick="quickChat('Acceptance criteria for EEL activation flow')">Acceptance criteria</button>
-    <button onclick="quickChat('Top 5 risks in GPOS subscription manager project')">Risk analysis</button>
-    <button onclick="quickChat('Professional email to Vijay requesting project status update')">Draft email</button>
-    <button onclick="quickChat('Key differences between BRD and FRD with examples')">BRD vs FRD</button>
-    <button onclick="quickChat('Change request for adding email notifications to EEL')">Change request</button>
-    <button onclick="sendPrompt('Create an RTM template for EEL requirements ↗')">RTM template ↗</button>
   </div>
 </div>
 

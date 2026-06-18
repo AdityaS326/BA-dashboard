@@ -283,10 +283,23 @@ const PAGE_TITLES = {
   su: "Stand-up generator", dc: "Document repository",
   lv: "Leave & resources",  ai: "General assistant",
 };
+
+function isProjectConfigured() {
+  return !!(localStorage.getItem("projectName") || "").trim();
+}
+function applyNavLock() {
+  const ok = isProjectConfigured();
+  document.querySelectorAll(".nav-item[data-panel]").forEach(el => {
+    if (el.dataset.panel === "ov") return;
+    el.classList.toggle("nav-locked", !ok);
+  });
+}
+
 window.nav = function (el) {
+  const id = el.dataset.panel;
+  if (id !== "ov" && !isProjectConfigured()) return;
   document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
-  const id      = el.dataset.panel;
   const panel   = document.getElementById("p-" + id);
   const content = document.getElementById("content");
   if (panel) panel.classList.add("active");
@@ -1906,12 +1919,17 @@ window.generateReport = async function () {
   card.style.display = "block";
   t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating report with ${labels[provider] || provider}…`;
   card.scrollIntoView({ behavior: "smooth", block: "start" });
+  let standupHistory = [];
+  try { standupHistory = JSON.parse(localStorage.getItem("su_history") || "[]"); } catch {}
   const data = await api.generateReport({
-    name:      document.getElementById("rp-name")?.value,
-    dept:      document.getElementById("rp-dept")?.value,
-    startTime: document.getElementById("rp-start")?.value,
-    endTime:   document.getElementById("rp-end")?.value,
-    context:   document.getElementById("rp-context")?.value,
+    name:           document.getElementById("rp-name")?.value,
+    dept:           document.getElementById("rp-dept")?.value,
+    role:           getMyRole(),
+    project:        localStorage.getItem("projectName") || "",
+    startTime:      document.getElementById("rp-start")?.value,
+    endTime:        document.getElementById("rp-end")?.value,
+    context:        document.getElementById("rp-context")?.value,
+    standupHistory,
     provider,
   });
   typeIn(t, data.text || data.error || "Error generating report");
@@ -2044,14 +2062,28 @@ window.generateStandup = async function () {
   const t = document.getElementById("su-output");
   if (!t) return;
   t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating stand-up...`;
-  const done     = document.getElementById("su-done")?.value    || "";
-  const today    = document.getElementById("su-today")?.value   || "";
+  const done     = document.getElementById("su-done")?.value     || "";
+  const today    = document.getElementById("su-today")?.value    || "";
   const blockers = document.getElementById("su-blockers")?.value || "";
-  const format   = document.getElementById("su-format")?.value  || "";
-  const data = await api.generateStandup({ done, today, blockers, format, name: "Aditya S" });
+  const tone     = document.getElementById("su-format")?.value   || "casual";
+  const name     = getDisplayName();
+  const role     = getMyRole();
+  const project  = localStorage.getItem("projectName") || "";
+  const provider = localStorage.getItem("ai_provider") || "groq";
+  const data = await api.generateStandup({ done, today, blockers, tone, name, role, project, provider });
   typeIn(t, data.text || data.error);
   if (data.text) {
-    _standupCtx = { done, today, blockers, standupText: data.text };
+    _standupCtx = { done, today, blockers, standupText: data.text, name, role };
+    // Save to standup history for weekly report
+    const entry = { date: new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }), done, today, blockers };
+    try {
+      const hist = JSON.parse(localStorage.getItem("su_history") || "[]");
+      hist.unshift(entry);
+      localStorage.setItem("su_history", JSON.stringify(hist.slice(0, 20)));
+    } catch {}
+    // Save for "Load yesterday" feature
+    localStorage.setItem("su_prev_done",  done);
+    localStorage.setItem("su_prev_today", today);
     const qaSection = document.getElementById("su-qa-section");
     if (qaSection) {
       document.getElementById("su-qa-history").innerHTML = "";
@@ -2061,10 +2093,13 @@ window.generateStandup = async function () {
   }
 };
 window.loadYesterday = function () {
-  const done  = document.getElementById("su-done");
-  const today = document.getElementById("su-today");
-  if (done)  done.value  = "Completed EEL Bug Portal customer & admin console. Applied ESDS doc policy to GPOS BRD v1.1/v1.2.";
-  if (today) today.value = "Working on SharePoint export integration for weekly reports. Reviewing GPOS BRD v1.2 changes.";
+  const doneEl  = document.getElementById("su-done");
+  const todayEl = document.getElementById("su-today");
+  const prevDone  = localStorage.getItem("su_prev_done")  || "";
+  const prevToday = localStorage.getItem("su_prev_today") || "";
+  if (doneEl  && prevToday) doneEl.value  = prevToday;
+  if (todayEl && prevDone)  todayEl.value = "";
+  if (!prevDone && !prevToday) showToast("No previous stand-up found — fill in the fields manually.");
 };
 window.standupQA = async function () {
   const input   = document.getElementById("su-qa-input");
@@ -2087,7 +2122,7 @@ window.standupQA = async function () {
   history.appendChild(aEl);
   history.scrollTop = history.scrollHeight;
 
-  const data = await api.standupQA({ ..._standupCtx, question });
+  const data = await api.standupQA({ ..._standupCtx, question, name: _standupCtx?.name || getDisplayName() });
 
   const ansEl = aEl.querySelector(".su-qa-ans");
   if (ansEl) typeIn(ansEl, data.answer || data.error);
@@ -2116,14 +2151,75 @@ function _suRenderSuggestions() {
 // ── Leave & Resources ──────────────────────────────────────────
 // ── Team members (leave register) ──────────────────────────────
 const LV_KEY = "teamMembers";
-function lvLoadMembers() { try { return JSON.parse(localStorage.getItem(LV_KEY) || "[]"); } catch { return []; } }
-function lvSaveMembers(arr) { localStorage.setItem(LV_KEY, JSON.stringify(arr)); }
+let _lvCache = [];
+function lvLoadMembers() { return _lvCache.length ? _lvCache : (()=>{ try { _lvCache = JSON.parse(localStorage.getItem(LV_KEY) || "[]"); return _lvCache; } catch { return []; } })(); }
+function lvSaveMembers(arr) { _lvCache = arr; localStorage.setItem(LV_KEY, JSON.stringify(arr)); }
 
-function renderStakeholders() {
+async function lvFetchFromServer() {
+  try {
+    const data = await api.teamMembers();
+    if (data && Array.isArray(data.members)) {
+      _lvCache = data.members;
+      localStorage.setItem(LV_KEY, JSON.stringify(_lvCache));
+    }
+  } catch {}
+}
+
+let _lvPollTimer = null;
+function lvStartPolling() {
+  if (_lvPollTimer) return;
+  _lvPollTimer = setInterval(async () => {
+    await lvFetchFromServer();
+    refreshLeaveCards();
+  }, 30000);
+}
+function lvStopPolling() {
+  if (_lvPollTimer) { clearInterval(_lvPollTimer); _lvPollTimer = null; }
+}
+
+function computeCurrentStatus(member) {
+  // If member has leave dates, check if today falls within range
+  if (member.leaveFrom && member.leaveTo) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const from  = new Date(member.leaveFrom);
+    const to    = new Date(member.leaveTo);
+    if (today >= from && today <= to) return "on-leave";
+    if (today > to) return "available";
+  }
+  return member.status || "available";
+}
+
+function autoComputeStatuses() {
+  const members = lvLoadMembers();
+  let changed = false;
+  members.forEach(m => {
+    const computed = computeCurrentStatus(m);
+    if (computed !== m.status) { m.status = computed; changed = true; }
+  });
+  if (changed) lvSaveMembers(members);
+}
+
+function refreshLeaveCards() {
+  autoComputeStatuses();
+  renderStakeholders();
+  populateMemberSelect();
+}
+
+function populateMemberSelect() {
+  const sel = document.getElementById("lv-member-select");
+  if (!sel) return;
+  const members = lvLoadMembers();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— select team member —</option>' +
+    members.map((m, i) => `<option value="${i}">${escHtml(m.name)} (${escHtml(m.role)})</option>`).join("");
+  if (cur) sel.value = cur;
+}
+
+function renderStakeholders(preloaded) {
   const tbody  = document.getElementById("stakeholder-tbody");
   const empty  = document.getElementById("lv-empty-row");
   if (!tbody) return;
-  const members = lvLoadMembers();
+  const members = preloaded || lvLoadMembers();
   tbody.querySelectorAll("tr.lv-member-row").forEach(r => r.remove());
   if (empty) empty.style.display = members.length ? "none" : "";
   members.forEach((m, i) => {
@@ -2161,7 +2257,7 @@ window.addTeamMember = function () {
   document.getElementById("lv-new-name").value = "";
   document.getElementById("lv-new-role").value = "";
   document.getElementById("lv-new-name").focus();
-  renderStakeholders();
+  refreshLeaveCards();
   showToast(`Team member "${name}" added successfully.`);
 };
 
@@ -2173,7 +2269,7 @@ window.removeTeamMember = function (i) {
   members.splice(i, 1);
   lvSaveMembers(members);
   lvCloseMenu();
-  renderStakeholders();
+  refreshLeaveCards();
   showToast('"' + removed + '" removed from team.');
 };
 
@@ -2184,9 +2280,9 @@ function lvGetMenuEl() {
   if (!el) {
     el = document.createElement("div");
     el.id = "lv-action-menu";
-    el.style.cssText = "display:none;position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);min-width:140px;overflow:hidden";
     document.body.appendChild(el);
   }
+  el.style.cssText = "display:none;position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);min-width:140px;overflow:hidden";
   return el;
 }
 function lvCloseMenu() {
@@ -2196,8 +2292,9 @@ function lvCloseMenu() {
 }
 
 window.lvToggleMenu = function (btn, i) {
+  const existing = document.getElementById("lv-action-menu");
+  if (_lvMenuIdx === i && existing && existing.style.display !== "none") { lvCloseMenu(); return; }
   const menu = lvGetMenuEl();
-  if (_lvMenuIdx === i && menu.style.display !== "none") { lvCloseMenu(); return; }
   _lvMenuIdx = i;
   const btnStyle = "width:100%;text-align:left;padding:8px 14px;background:none;border:none;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;";
   menu.innerHTML =
@@ -2237,9 +2334,9 @@ window.saveTeamMember = function (i) {
   if (!role)  { showToast("Role cannot be empty."); return; }
   const members = lvLoadMembers();
   if (!members[i]) return;
-  members[i] = { name, role, status };
+  members[i] = { ...members[i], name, role, status };
   lvSaveMembers(members);
-  renderStakeholders();
+  refreshLeaveCards();
   showToast(name + " updated.");
 };
 
@@ -2264,7 +2361,7 @@ document.addEventListener("click", function (e) {
   // persist email changes
   document.getElementById("lv-to-email")?.addEventListener("change", e => localStorage.setItem("lv_mgr_email", e.target.value));
   document.getElementById("lv-cc-email")?.addEventListener("change", e => localStorage.setItem("lv_hr_email",  e.target.value));
-  renderStakeholders();
+  lvFetchFromServer().then(() => refreshLeaveCards());
 })();
 
 window.syncLeaveFromExchange = async function (btn) {
@@ -2305,6 +2402,38 @@ window.syncLeaveFromExchange = async function (btn) {
   showToast(`Leave sync complete — ${meetings.length} events loaded.`);
 };
 
+window.applyLeave = async function () {
+  const fromDate   = document.getElementById("lv-from")?.value || "";
+  const toDate     = document.getElementById("lv-to")?.value   || "";
+  const leaveType  = document.getElementById("lv-type")?.value || "Planned leave";
+  const senderName = getDisplayName();
+
+  if (!fromDate) { showToast("Select a leave start date."); return; }
+  if (!senderName) { showToast("Enter your name in the Weekly Report name field first."); return; }
+
+  // Mark the person on leave in the team members list
+  const members = lvLoadMembers();
+  const idx = members.findIndex(mb => mb.name.toLowerCase() === senderName.toLowerCase());
+  if (idx !== -1) {
+    members[idx].status    = "on-leave";
+    members[idx].leaveFrom = fromDate;
+    members[idx].leaveTo   = toDate || fromDate;
+  } else {
+    // Auto-add self if not in list
+    members.push({ name: senderName, role: localStorage.getItem("rp_role") || "Team Member", status: "on-leave", leaveFrom: fromDate, leaveTo: toDate || fromDate });
+  }
+  lvSaveMembers(members);
+
+  // Persist to server
+  try { await api.saveTeamMembers(members); } catch {}
+
+  refreshLeaveCards();
+
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+  const range = fromDate === toDate ? fmt(fromDate) : `${fmt(fromDate)} – ${fmt(toDate)}`;
+  showToast(`Leave applied for ${senderName}: ${range}`);
+};
+
 window.generateLeaveEmail = async function () {
   const t        = document.getElementById("lv-output");
   const controls = document.getElementById("lv-email-controls");
@@ -2322,13 +2451,15 @@ window.generateLeaveEmail = async function () {
   const toEmail   = document.getElementById("lv-to-email")?.value?.trim() || "";
   const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : d;
   const dateRange = fromDate === toDate ? fmt(fromDate) : `${fmt(fromDate)} to ${fmt(toDate)}`;
-  const senderName = document.getElementById("rp-name")?.value?.trim() || localStorage.getItem("userName") || "Team Member";
+  const senderName = getDisplayName() || "Team Member";
+  const project    = localStorage.getItem("projectName") || "";
+  const projectCtx = project ? ` Currently working on the ${project} project.` : "";
   const prompt = `Write a formal, professional ${leaveType.toLowerCase()} request email from ${senderName} (ESDS Software Solution Pvt. Ltd.)` +
     ` for dates: ${dateRange}.` +
     (reason ? ` Reason: ${reason}.` : "") +
-    ` To: ${toEmail || "Manager"}.` +
+    ` To: ${toEmail || "Manager"}.${projectCtx}` +
     ` Include: polite greeting, specific leave dates, brief reason, assurance of work handover, request for approval, and a thank-you close. Do not include a subject line. Use a professional letter format with proper paragraph spacing.`;
-  const data = await api.chat(prompt, "You write formal, courteous workplace emails in proper letter format.");
+  const data = await api.chat(prompt, "You write formal, courteous workplace emails in proper letter format.", null, getWorkContext());
   const text = data.text || data.error || "";
   t.setAttribute("contenteditable", "true");
   typeIn(t, text);
@@ -2435,39 +2566,95 @@ function renderMarkdown(text) {
   return html;
 }
 
-const CHAT_SUGGESTIONS = [
-  "Write user stories for EEL subscription management",
-  "Write user stories for GPOS billing flow",
-  "Create acceptance criteria for EEL activation",
-  "Create a BRD outline for",
-  "Draft a formal email to Vijay regarding",
-  "Identify risks in the EEL project",
-  "Top 5 risks in GPOS subscription manager",
-  "Create an RTM template for EEL requirements",
-  "Key differences between BRD and FRD",
-  "Write a change request for",
-  "Create a RACI matrix for the EEL project",
-  "Write test cases for EEL onboarding flow",
-  "Summarize key requirements for",
-  "Create a gap analysis for",
-  "Write an executive summary for EEL project",
-  "Define KPIs for the BA team",
-  "Draft meeting agenda for project review",
-  "Create stakeholder register for GPOS",
-  "Write a project charter for",
-  "Identify dependencies in the EEL implementation",
-  "How do I write a good use case?",
-  "What is the difference between functional and non-functional requirements?",
-  "Explain MoSCoW prioritization",
-  "How should I structure a requirements traceability matrix?",
-];
+// ── User context helpers ───────────────────────────────────────
+function getDisplayName() {
+  return document.getElementById("rp-name")?.value?.trim()
+    || localStorage.getItem("rp_name")
+    || localStorage.getItem("firstName")
+    || "";
+}
+
+function getMyRole() {
+  return document.getElementById("rp-dept")?.value?.trim()
+    || localStorage.getItem("rp_dept")
+    || "";
+}
+
+function buildChatGreeting() {
+  const name    = getDisplayName();
+  const project = localStorage.getItem("projectName") || "";
+  const hi      = name ? `Hi ${name.split(" ")[0]}!` : "Hi!";
+  const proj = project ? ` How can I help you with **${project}**?` : " How can I help you today?";
+  return `${hi}${proj}`;
+}
+
+function getWorkContext() {
+  return {
+    userName:    getDisplayName(),
+    userRole:    getMyRole(),
+    recentWork:  localStorage.getItem("su_prev_done")  || "",
+    currentPlan: localStorage.getItem("su_prev_today") || "",
+  };
+}
+
+function getChatSuggestions() {
+  const project = localStorage.getItem("projectName") || "";
+  const p = project ? project : "the project";
+  return [
+    `Write user stories for ${p}`,
+    `Create acceptance criteria for ${p}`,
+    `Create a BRD outline for ${p}`,
+    `Identify risks in ${p}`,
+    `Create an RTM template for ${p}`,
+    `Write a gap analysis for ${p}`,
+    `Draft a formal email regarding ${p}`,
+    "Key differences between BRD and FRD",
+    "Write a change request for",
+    "Create a RACI matrix for",
+    "Write test cases for",
+    "Summarize key requirements for",
+    "Write an executive summary for",
+    "Define KPIs for the team",
+    "Draft meeting agenda for project review",
+    "Create stakeholder register for",
+    "Write a project charter for",
+    "How do I write a good use case?",
+    "What is the difference between functional and non-functional requirements?",
+    "Explain MoSCoW prioritization",
+    "How should I structure a requirements traceability matrix?",
+  ];
+}
+
+function appendFollowupChips(msgEl, lastMsg) {
+  const project = localStorage.getItem("projectName") || "";
+  const msg = lastMsg.toLowerCase();
+  let chips = [];
+  if (/brd|requirement|user stor/i.test(msg))
+    chips = ["Create acceptance criteria", "Write an RTM", "Identify risks", "Add non-functional requirements"];
+  else if (/risk|issue|blocker/i.test(msg))
+    chips = ["Create a mitigation plan", "Write a risk register", "Prioritize these risks", "Draft a status update"];
+  else if (/email|letter|draft/i.test(msg))
+    chips = ["Make it more formal", "Make it shorter", "Add a follow-up reminder", "Translate to Hindi"];
+  else if (/test|qa|bug/i.test(msg))
+    chips = ["Write automation test cases", "Create a test plan", "Prioritize test scenarios", "Write a bug report"];
+  else
+    chips = [`Write user stories for ${project || "the project"}`, "Summarize this", "Create a checklist", "Draft an email about this"];
+
+  if (!chips.length) return;
+  const chipRow = document.createElement("div");
+  chipRow.className = "chat-followups";
+  chipRow.innerHTML = chips.map(c =>
+    `<button class="chat-followup-chip" onclick="document.getElementById('chat-input').value=${JSON.stringify(c)};sendChatMessage()">${escHtml(c)}</button>`
+  ).join("");
+  msgEl.appendChild(chipRow);
+}
 
 window.chatAutocomplete = function (val) {
   const box = document.getElementById("chat-suggestions");
   if (!box) return;
   const q = val.trim().toLowerCase();
   if (q.length < 2) { box.style.display = "none"; return; }
-  const matches = CHAT_SUGGESTIONS.filter((s) => s.toLowerCase().includes(q)).slice(0, 6);
+  const matches = getChatSuggestions().filter((s) => s.toLowerCase().includes(q)).slice(0, 6);
   if (!matches.length) { box.style.display = "none"; return; }
   box.style.display = "block";
   box.innerHTML = matches.map((s) =>
@@ -2498,7 +2685,7 @@ window.sendChatMessage = async function () {
   thinking.innerHTML = `<div class="msg-lbl">Assistant</div><span class="ldot" style="background:var(--muted)"></span> Thinking…`;
   msgs.appendChild(thinking);
   msgs.scrollTop = msgs.scrollHeight;
-  const data = await api.chat(msg);
+  const data = await api.chat(msg, null, null, getWorkContext());
   if (data.error) {
     thinking.innerHTML =
       `<div class="msg-lbl" style="color:var(--red)">Error</div>` +
@@ -2508,6 +2695,7 @@ window.sendChatMessage = async function () {
       `<button class="sm" style="font-size:11px;margin-left:4px" onclick="setAIProvider('anthropic')">🧠 Claude</button></div>`;
   } else {
     thinking.innerHTML = `<div class="msg-lbl">Assistant</div>${renderMarkdown(data.text || "No response")}`;
+    appendFollowupChips(thinking, msg);
   }
   msgs.scrollTop = msgs.scrollHeight;
 };
@@ -2522,7 +2710,7 @@ window.quickChat = function (msg) {
 
 window.clearChat = function () {
   const msgs = document.getElementById("chat-messages");
-  if (msgs) msgs.innerHTML = '<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Chat cleared. How can I help?</div>';
+  if (msgs) msgs.innerHTML = `<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>${escHtml(buildChatGreeting())}</div>`;
 };
 
 window.setAIProvider = function (provider) {
@@ -2559,6 +2747,12 @@ window.submitProjectSetup = function () {
 
   window.updateProjectName(val);
   window.setAIProvider(provider);
+  applyNavLock();
+  // Update chat greeting with new project name
+  const msgs = document.getElementById("chat-messages");
+  if (msgs && msgs.children.length <= 1) {
+    msgs.innerHTML = `<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>${escHtml(buildChatGreeting())}</div>`;
+  }
   showOvMain();
   showToast(`Project "${val}" saved — AI: ${provider}`);
 };
@@ -2628,6 +2822,15 @@ function handleOAuthReturn() {
 
 // ── Init ───────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
+  // Nav lock
+  applyNavLock();
+
+  // Chat greeting
+  const chatMsgs = document.getElementById("chat-messages");
+  if (chatMsgs && chatMsgs.children.length <= 1) {
+    chatMsgs.innerHTML = `<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>${escHtml(buildChatGreeting())}</div>`;
+  }
+
   // Calendar
   renderCalendar(events);
   renderSchedule(todayKey(), events);
