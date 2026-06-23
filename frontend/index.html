@@ -511,13 +511,67 @@
 
 <!-- ██ MOM ████████████████████████████████████████████████████████████████ -->
 <div class="panel" id="p-mm">
+
+  <!-- Transcribe recording -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-microphone"></i>Transcribe meeting recording</span><span class="badge" style="background:var(--surface2);color:var(--muted);font-size:10px">Groq Whisper</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Upload any meeting recording (.mp3 / .wav / .mp4 / .m4a) — up to 500 MB. Large video files are automatically converted to audio and chunked before transcription.</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;color:var(--text);flex-shrink:0">
+        <i class="ti ti-upload"></i><span id="tr-file-name">Choose recording</span>
+        <input type="file" id="tr-file-input" accept=".mp3,.wav,.mp4,.m4a,.webm,.ogg" style="display:none" onchange="onTranscribeFileChosen(this)">
+      </label>
+      <button class="primary sm" id="tr-btn" onclick="transcribeRecording(this)" disabled><i class="ti ti-wand"></i> Transcribe</button>
+      <span id="tr-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="tr-result" style="display:none">
+      <label>Transcript <span style="color:var(--green);font-size:11px;font-weight:400"><i class="ti ti-circle-check" style="font-size:11px"></i> Auto-loaded into MOM generator</span></label>
+      <textarea id="tr-transcript" rows="6" style="width:100%;resize:vertical;font-size:12px;font-family:var(--mono)" placeholder="Transcript will appear here..."></textarea>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-hd"><span class="card-title"><i class="ti ti-clipboard"></i>MOM Generator</span></div>
-    <label>Select a meeting from this week</label>
-    <select id="mm-meeting-select" style="margin-bottom:10px" onchange="onMOMSelectChange()">
-      <option value="">— sync calendar to load meetings —</option>
-    </select>
-    <div id="mm-meeting-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.8"></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px">
+      <label style="margin:0">Transcript</label>
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text);white-space:nowrap">
+        <i class="ti ti-file-upload" style="font-size:13px"></i> Upload transcript
+        <input type="file" id="mm-transcript-file" accept=".txt,.vtt,.srt,.md,.docx" style="display:none" onchange="onMOMTranscriptFileChosen(this)">
+      </label>
+    </div>
+    <!-- Shown when transcript is auto-loaded from the Transcribe section above -->
+    <div id="mm-transcript-loaded" style="display:none;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:12px">
+      <i class="ti ti-circle-check" style="color:var(--green);font-size:14px"></i>
+      <span id="mm-transcript-loaded-label">Transcript loaded from recording</span>
+      <button onclick="clearAutoTranscript()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0">&#x2715; Clear</button>
+    </div>
+    <!-- Shown when user pastes or uploads manually -->
+    <textarea id="mm-transcript-input" rows="6" style="width:100%;resize:vertical;font-size:12px;font-family:var(--mono);margin-bottom:12px" placeholder="Paste your meeting transcript here, or upload a .txt / .vtt / .srt / .docx file…" oninput="onMOMTranscriptChange()"></textarea>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label>Meeting title <span style="color:var(--muted);font-size:11px;font-weight:400">(optional)</span></label>
+        <input type="text" id="mm-title-input" placeholder="e.g. Sprint Planning" style="width:100%">
+      </div>
+      <div>
+        <label>Date <span style="color:var(--muted);font-size:11px;font-weight:400">(optional)</span></label>
+        <input type="date" id="mm-date-input" style="width:100%">
+      </div>
+    </div>
+    <label>Attendees <span style="color:var(--muted);font-size:11px;font-weight:400">(optional, comma-separated)</span></label>
+    <input type="text" id="mm-attendees-input" placeholder="e.g. Alice, Bob, Carol" style="width:100%;margin-bottom:14px">
+
+    <details style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--muted);user-select:none"><i class="ti ti-calendar" style="font-size:11px"></i> Auto-fill from calendar meeting (optional)</summary>
+      <div style="margin-top:8px">
+        <select id="mm-meeting-select" onchange="onMOMSelectChange()">
+          <option value="">— sync calendar to load meetings —</option>
+        </select>
+        <div id="mm-meeting-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:var(--muted);margin-top:8px;line-height:1.8"></div>
+      </div>
+    </details>
+
     <button class="primary" id="mm-gen-btn" onclick="generateMOM()" disabled><i class="ti ti-bolt"></i> Generate MOM</button>
   </div>
   <div class="card" id="mm-output-card" style="display:none">
@@ -798,6 +852,7 @@
 </div><!-- /app -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

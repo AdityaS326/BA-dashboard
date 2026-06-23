@@ -1970,66 +1970,200 @@ window.populateMOMDropdown = function () {
   const weekAgo  = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7); weekAgo.setHours(0, 0, 0, 0);
   const weekly   = _ewsMeetings
     .filter(m => { const d = new Date(m.start); return d >= weekAgo && d <= now; })
-    .sort((a, b) => new Date(b.start) - new Date(a.start)); // newest first
+    .sort((a, b) => new Date(b.start) - new Date(a.start));
   sel.innerHTML = weekly.length
     ? `<option value="">— select a meeting —</option>` +
-      weekly.map((m, i) => {
+      weekly.map((m) => {
         const d = new Date(m.start);
         const label = `${m.subject} — ${isNaN(d) ? m.start : d.toLocaleDateString("en-IN", { weekday:"short", day:"2-digit", month:"short" }) + " at " + d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })}`;
         const realIdx = _ewsMeetings.indexOf(m);
         return `<option value="${realIdx}">${label}</option>`;
       }).join("")
     : `<option value="">— no meetings found this week (sync calendar first) —</option>`;
-  // reset state
   const info = document.getElementById("mm-meeting-info"); if (info) info.style.display = "none";
-  const btn  = document.getElementById("mm-gen-btn");      if (btn)  btn.disabled = true;
   const card = document.getElementById("mm-output-card");  if (card) card.style.display = "none";
+  updateMOMGenBtn();
 };
 window.onMOMSelectChange = function () {
   const sel  = document.getElementById("mm-meeting-select");
   const info = document.getElementById("mm-meeting-info");
-  const btn  = document.getElementById("mm-gen-btn");
   const idx  = parseInt(sel?.value, 10);
-  if (isNaN(idx) || idx < 0) { if (info) info.style.display = "none"; if (btn) btn.disabled = true; return; }
-  const m    = _ewsMeetings[idx];
-  if (!m)    { if (info) info.style.display = "none"; if (btn) btn.disabled = true; return; }
-  const d    = new Date(m.start);
+  if (isNaN(idx) || idx < 0) { if (info) info.style.display = "none"; return; }
+  const m = _ewsMeetings[idx];
+  if (!m) { if (info) info.style.display = "none"; return; }
+  const d = new Date(m.start);
+  // Auto-fill optional detail fields
+  const titleEl     = document.getElementById("mm-title-input");
+  const dateEl      = document.getElementById("mm-date-input");
+  const attendeesEl = document.getElementById("mm-attendees-input");
+  if (titleEl)     titleEl.value     = m.subject || "";
+  if (dateEl && !isNaN(d)) dateEl.value = d.toISOString().slice(0, 10);
+  if (attendeesEl) attendeesEl.value = (m.attendees || []).join(", ");
   const rows = [
-    `<i class="ti ti-calendar" style="font-size:11px"></i> ${isNaN(d) ? m.start : d.toLocaleDateString("en-IN", { weekday:"long", day:"2-digit", month:"long", year:"numeric" }) + (isNaN(d) ? "" : " · " + d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" }))}`,
+    `<i class="ti ti-calendar" style="font-size:11px"></i> ${isNaN(d) ? m.start : d.toLocaleDateString("en-IN", { weekday:"long", day:"2-digit", month:"long", year:"numeric" }) + " · " + d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" })}`,
     m.dur       ? `<i class="ti ti-clock" style="font-size:11px"></i> ${m.dur}` : "",
     m.location  ? `<i class="ti ti-map-pin" style="font-size:11px"></i> ${escHtml(m.location)}` : "",
     m.attendees?.length ? `<i class="ti ti-users" style="font-size:11px"></i> ${escHtml(m.attendees.join(", "))}` : "",
   ].filter(Boolean);
-  info.innerHTML = rows.join("<br>");
-  info.style.display = "block";
-  btn.disabled = false;
+  if (info) { info.innerHTML = rows.join("<br>"); info.style.display = "block"; }
 };
+// ── Whisper transcription ───────────────────────────────────────
+let _momTranscript = "";
+
+function updateMOMGenBtn() {
+  const btn = document.getElementById("mm-gen-btn");
+  if (btn) btn.disabled = !_momTranscript;
+}
+
+function showTranscriptBadge(label) {
+  document.getElementById("mm-transcript-loaded-label").textContent = label;
+  document.getElementById("mm-transcript-loaded").style.display = "flex";
+  const ta = document.getElementById("mm-transcript-input");
+  ta.value = "";
+  ta.style.display = "none";
+}
+
+function showTranscriptTextarea() {
+  document.getElementById("mm-transcript-loaded").style.display = "none";
+  document.getElementById("mm-transcript-input").style.display = "";
+}
+
+window.clearAutoTranscript = function () {
+  _momTranscript = "";
+  showTranscriptTextarea();
+  updateMOMGenBtn();
+};
+
+window.onMOMTranscriptChange = function () {
+  _momTranscript = document.getElementById("mm-transcript-input")?.value?.trim() || "";
+  updateMOMGenBtn();
+};
+
+window.onMOMTranscriptFileChosen = function (input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = "";
+
+  function applyText(text) {
+    showTranscriptTextarea();
+    const ta = document.getElementById("mm-transcript-input");
+    if (ta) ta.value = text;
+    _momTranscript = text.trim();
+    updateMOMGenBtn();
+    showToast(`Transcript loaded from ${file.name}`);
+  }
+
+  if (file.name.endsWith(".docx")) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      mammoth.extractRawText({ arrayBuffer: e.target.result })
+        .then(result => applyText(result.value || ""))
+        .catch(() => showToast("Could not read .docx file"));
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => applyText(e.target.result || "");
+    reader.readAsText(file);
+  }
+};
+
+window.onTranscribeFileChosen = function (input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById("tr-file-name").textContent = file.name;
+  document.getElementById("tr-btn").disabled = false;
+  document.getElementById("tr-status").textContent = "";
+  _momTranscript = "";
+  showTranscriptTextarea();
+  updateMOMGenBtn();
+};
+
+window.transcribeRecording = async function (btn) {
+  const input = document.getElementById("tr-file-input");
+  if (!input?.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 500 * 1024 * 1024) {
+    document.getElementById("tr-status").textContent = "File exceeds 500 MB limit.";
+    document.getElementById("tr-status").style.color = "var(--red)";
+    return;
+  }
+  btn.disabled = true;
+  const statusEl = document.getElementById("tr-status");
+  statusEl.style.color = "var(--muted)";
+  statusEl.textContent = file.size > 24 * 1024 * 1024
+    ? "Large file detected — converting audio and transcribing… this may take a few minutes"
+    : "Transcribing… this may take a minute";
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const data = await api.transcribeAudio(form);
+  btn.disabled = false;
+  if (data.error) {
+    statusEl.style.color = "var(--red)";
+    statusEl.textContent = data.error;
+    return;
+  }
+  statusEl.textContent = "Done";
+  statusEl.style.color = "var(--green)";
+  const transcript = data.transcript || "";
+  document.getElementById("tr-transcript").value = transcript;
+  document.getElementById("tr-result").style.display = "block";
+  // Auto-load into MOM generator — show badge, don't duplicate in textarea
+  _momTranscript = transcript.trim();
+  showTranscriptBadge("Transcript loaded from recording");
+  updateMOMGenBtn();
+  showToast("Transcript ready — fill in optional details and click Generate MOM");
+};
+
 window.generateMOM = async function () {
-  const sel  = document.getElementById("mm-meeting-select");
   const card = document.getElementById("mm-output-card");
   const o    = document.getElementById("mom-output");
-  const idx  = parseInt(sel?.value, 10);
-  const m    = _ewsMeetings[idx];
-  if (!m || !o) return;
+  if (!o || !_momTranscript) return;
+
+  // Optional detail inputs (may be auto-filled from calendar or entered manually)
+  const titleInput = document.getElementById("mm-title-input")?.value?.trim();
+  const dateInput  = document.getElementById("mm-date-input")?.value;
+  const attsInput  = document.getElementById("mm-attendees-input")?.value?.trim();
+
+  // Calendar meeting (optional, selected under details section)
+  const sel = document.getElementById("mm-meeting-select");
+  const idx = parseInt(sel?.value, 10);
+  const m   = !isNaN(idx) && idx >= 0 ? _ewsMeetings[idx] : null;
+
+  const subject   = titleInput || m?.subject || "Meeting";
+  const attendees = attsInput  || (m?.attendees || []).join(", ") || "Not specified";
+  const duration  = m?.dur || "";
+  const context   = m?.location || "";
+  let dateStr;
+  if (dateInput) {
+    dateStr = new Date(dateInput + "T00:00:00").toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" });
+  } else if (m?.start) {
+    const s = new Date(m.start);
+    dateStr = isNaN(s) ? m.start : s.toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" });
+  } else {
+    dateStr = new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" });
+  }
+
   card.style.display = "block";
   o.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating MOM…`;
   card.scrollIntoView({ behavior: "smooth", block: "start" });
-  const start = new Date(m.start);
-  const data  = await api.teamsMOM({
-    subject:   m.subject,
-    date:      isNaN(start) ? m.start : start.toLocaleDateString("en-IN", { day:"2-digit", month:"long", year:"numeric" }),
-    attendees: (m.attendees || []).join(", ") || "Not specified",
-    duration:  m.dur || "N/A",
-    context:   m.location || "",
+  const data = await api.teamsMOM({
+    subject:    subject,
+    date:       dateStr,
+    attendees:  attendees,
+    duration:   duration,
+    context:    context,
+    transcript: _momTranscript,
   });
   typeIn(o, data.text || data.error || "Error generating MOM");
 };
 window.downloadMOMDoc = function () {
   const content = document.getElementById("mom-output")?.innerText || "";
   if (!content) return;
-  const sel     = document.getElementById("mm-meeting-select");
-  const idx     = parseInt(sel?.value, 10);
-  const title   = (_ewsMeetings[idx]?.subject || "MOM").replace(/\s+/g, "_");
+  const titleInput = document.getElementById("mm-title-input")?.value?.trim();
+  const sel        = document.getElementById("mm-meeting-select");
+  const idx        = parseInt(sel?.value, 10);
+  const title      = (titleInput || _ewsMeetings[idx]?.subject || "MOM").replace(/\s+/g, "_");
   const fmt     = document.getElementById("mm-dl-fmt")?.value || "pdf";
   if (fmt === "doc") {
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Calibri,sans-serif;font-size:11pt;line-height:1.6;margin:2cm">${content.replace(/\n/g, "<br>")}</body></html>`;

@@ -21,6 +21,7 @@ import outlookRouter     from "./routes/outlook.js";
 import msCalendarRouter  from "./routes/mscalendar.js";
 import ewsRouter         from "./routes/ews.js";
 import documentsRouter   from "./routes/documents.js";
+import transcribeRouter   from "./routes/transcribe.js";
 import teamMembersRouter  from "./routes/teamMembers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,7 @@ app.use("/api/outlook",     outlookRouter);
 app.use("/api/mscalendar",  msCalendarRouter);
 app.use("/api/ews",         ewsRouter);
 app.use("/api/documents",  documentsRouter);
+app.use("/api/transcribe",   transcribeRouter);
 app.use("/api/team-members", teamMembersRouter);
 
 // ── Microsoft OAuth login redirect ─────────────────────────────
