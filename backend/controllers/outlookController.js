@@ -10,6 +10,49 @@ function isOnPremiseError(msg, code) {
   return m.includes("on-premise") || m.includes("inactive") || m.includes("soft-deleted") || code === "MailboxNotEnabledForRESTAPI";
 }
 
+// GET /api/outlook/emails/:id/body
+export async function getEmailBody(req, res) {
+  const token = req.query.token || req.headers["x-ms-token"] || "";
+  const { id } = req.params;
+  if (!token) return res.status(400).json({ error: "No Microsoft token." });
+  if (!id)    return res.status(400).json({ error: "Missing email id." });
+
+  const auth = { Authorization: bearer(token) };
+
+  try {
+    // Fetch body and inline attachments in parallel
+    const [bodyResp, attResp] = await Promise.all([
+      fetch(`https://graph.microsoft.com/v1.0/me/messages/${id}?$select=body`, { headers: auth }),
+      fetch(`https://graph.microsoft.com/v1.0/me/messages/${id}/attachments`, { headers: auth }),
+    ]);
+
+    if (!bodyResp.ok) {
+      const err = await bodyResp.json();
+      return res.status(bodyResp.status).json({ error: err.error?.message || "Graph API error" });
+    }
+
+    const bodyData  = await bodyResp.json();
+    const bodyType  = bodyData.body?.contentType || "text";
+    let   html      = bodyData.body?.content || "";
+
+    // Replace cid: inline image references with base64 data URLs
+    if (bodyType === "html" && attResp.ok) {
+      const attData    = await attResp.json();
+      const attachments = (attData.value || []).filter(a => a.isInline && a["@odata.type"] === "#microsoft.graph.fileAttachment");
+      for (const att of attachments) {
+        if (!att.contentId || !att.contentBytes) continue;
+        const cid     = att.contentId.replace(/^<|>$/g, "");
+        const dataUrl = `data:${att.contentType};base64,${att.contentBytes}`;
+        html = html.replace(new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"), dataUrl);
+      }
+    }
+
+    res.json({ body: html, bodyType });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+}
+
 // GET /api/outlook/emails
 export async function getEmails(req, res) {
   const token = req.query.token || req.headers["x-ms-token"] || "";

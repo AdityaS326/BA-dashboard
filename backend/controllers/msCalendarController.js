@@ -5,7 +5,7 @@ function bearer(token) {
   return token.startsWith("Bearer ") ? token : `Bearer ${token}`;
 }
 
-// GET /api/mscalendar/events â€” calendar events for next 30 days
+// GET /api/mscalendar/events â€" calendar events for next 30 days
 export async function getEvents(req, res) {
   const token = req.query.token || req.headers["x-ms-token"] || "";
   if (!token) return res.status(400).json({ error: "No Microsoft token. Connect via Microsoft 365 first." });

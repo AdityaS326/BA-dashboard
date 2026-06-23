@@ -283,10 +283,23 @@ const PAGE_TITLES = {
   su: "Stand-up generator", dc: "Document repository",
   lv: "Leave & resources",  ai: "General assistant",
 };
+
+function isProjectConfigured() {
+  return !!(localStorage.getItem("projectName") || "").trim();
+}
+function applyNavLock() {
+  const ok = isProjectConfigured();
+  document.querySelectorAll(".nav-item[data-panel]").forEach(el => {
+    if (el.dataset.panel === "ov") return;
+    el.classList.toggle("nav-locked", !ok);
+  });
+}
+
 window.nav = function (el) {
+  const id = el.dataset.panel;
+  if (id !== "ov" && !isProjectConfigured()) return;
   document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
-  const id      = el.dataset.panel;
   const panel   = document.getElementById("p-" + id);
   const content = document.getElementById("content");
   if (panel) panel.classList.add("active");
@@ -298,6 +311,22 @@ window.nav = function (el) {
   if (appEl) appEl.classList.toggle("login-mode", isLogin);
   if (isLogin) { startTmBackground(); } else { stopTmBackground(); }
 
+  if (id === "tc") {
+    const tok      = localStorage.getItem("spToken") || "";
+    const noTokEl  = document.getElementById("tc-no-token");
+    const chatUiEl = document.getElementById("tc-chat-ui");
+    if (tok) {
+      if (noTokEl) noTokEl.style.display = "none";
+      if (chatUiEl && chatUiEl.style.display === "none" && document.getElementById("tc-chat-list")?.children.length <= 1) {
+        window.syncTeamsChats(document.getElementById("tc-sync-btn"));
+      } else if (chatUiEl) {
+        chatUiEl.style.display = "block";
+      }
+    } else {
+      if (noTokEl)  noTokEl.style.display  = "block";
+      if (chatUiEl) chatUiEl.style.display = "none";
+    }
+  }
   if (id === "cal") {
     renderCalendar(events);
     renderSchedule(todayKey(), events);
@@ -306,17 +335,30 @@ window.nav = function (el) {
       window.syncOutlookCalendar(document.getElementById("cal-sync-btn"));
     }
   }
+
+  if (id === "dc") {
+    window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
+  }
 };
 
 // ── Clock ──────────────────────────────────────────────────────
+function getISOWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return { week: Math.ceil(((date - yearStart) / 86400000 + 1) / 7), year: date.getUTCFullYear() };
+}
+
 function tick() {
   const n = new Date();
-  const clockEl = document.getElementById("clk");
-  const dateEl  = document.getElementById("dt-lbl");
-  const tbTime  = document.getElementById("topbar-time");
-  if (clockEl) clockEl.textContent = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  if (dateEl)  dateEl.textContent  = n.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  if (tbTime)  tbTime.textContent  = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  const clockEl   = document.getElementById("clk");
+  const dateEl    = document.getElementById("dt-lbl");
+  const tbTime    = document.getElementById("topbar-time");
+  const tbWeekEl  = document.getElementById("topbar-week");
+  if (clockEl)  clockEl.textContent  = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (dateEl)   dateEl.textContent   = n.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  if (tbTime)   tbTime.textContent   = n.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  if (tbWeekEl) { const { week, year } = getISOWeek(n); tbWeekEl.textContent = `Wk ${week} · ${year}`; }
   checkAndShowReminder(events);
 }
 setInterval(tick, 1000);
@@ -334,7 +376,14 @@ window.addEvent = async () => {
 
   // 2 — send Outlook invite via Exchange if connected
   const creds = ewsGetCreds();
-  if (!creds.ewsUrl) return; // not connected — local only
+  const statusEl = document.getElementById("ev-invite-status");
+  const btn      = document.getElementById("ev-add-btn");
+
+  if (!creds.ewsUrl) {
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "rgba(220,150,0,.1)"; statusEl.style.color = "var(--orange,#d97706)"; statusEl.textContent = "⚠ Not connected to Exchange — event saved locally only. Connect in the Teams panel to send invites."; }
+    setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 6000);
+    return;
+  }
 
   const title    = document.getElementById("ev-title")?.value?.trim();
   const date     = document.getElementById("ev-date")?.value || new Date().toISOString().slice(0, 10);
@@ -342,13 +391,16 @@ window.addEvent = async () => {
   const dur      = document.getElementById("ev-dur")?.value;
   const attRaw   = document.getElementById("ev-att")?.value?.trim();
   const location = document.getElementById("ev-location")?.value?.trim();
+  const desc     = document.getElementById("ev-desc")?.value?.trim();
 
-  if (!title) return;
+  if (!title) {
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ Please enter a meeting subject."; }
+    setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 4000);
+    return;
+  }
   const attendees = attRaw ? attRaw.split(/[,;]+/).map(a => a.trim()).filter(a => a.includes("@")) : [];
 
-  const statusEl = document.getElementById("ev-invite-status");
-  const btn      = document.getElementById("ev-add-btn");
-  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending invite via Outlook…"; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending invite via Exchange…"; }
   if (btn) btn.disabled = true;
 
   const data = await api.ewsCreateMeeting({
@@ -359,16 +411,21 @@ window.addEvent = async () => {
     duration:  dur,
     attendees,
     location,
+    body:      desc,
   });
 
   if (btn) btn.disabled = false;
   if (data.ok) {
-    if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ Invite sent to ${attendees.length ? attendees.join(", ") : "your calendar"} via Outlook.`; }
-    showToast("Meeting invite sent via Outlook!");
+    const sent = (data.sentTo && data.sentTo.length) ? data.sentTo : attendees;
+    const recipientMsg = sent.length ? `Invite sent to: ${sent.join(", ")}` : "Saved to your calendar";
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ ${recipientMsg}`; }
+    showToast(`Meeting "${title}" created & invite sent via Exchange!`);
+    const descEl = document.getElementById("ev-desc");    if (descEl) descEl.value = "";
+    const locEl  = document.getElementById("ev-location"); if (locEl) locEl.value = "";
   } else {
-    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error}`; }
+    if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error}`; }
   }
-  setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 5000);
+  setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 6000);
 };
 
 // ── Overview charts ────────────────────────────────────────────
@@ -413,7 +470,10 @@ window.uploadDocFromForm = async function (btn) {
   const token = localStorage.getItem("spToken") || "";
   if (!token) {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-upload"></i> Upload'; }
-    if (statusEl) statusEl.textContent = "Saved locally — no SharePoint token. Connect Microsoft 365 in Weekly Report → Settings to upload.";
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.innerHTML = `<i class="ti ti-alert-circle" style="color:var(--orange);margin-right:4px"></i>Microsoft 365 not connected — <a href="/api/auth/microsoft" style="color:#0078d4;font-weight:600;text-decoration:none">Connect now</a> to upload to SharePoint.`;
+    }
     return;
   }
 
@@ -426,21 +486,178 @@ window.uploadDocFromForm = async function (btn) {
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-upload"></i> Upload'; }
 
   if (data.error) {
-    if (statusEl) statusEl.textContent = "Upload failed: " + data.error;
-    showToast("Upload failed: " + data.error);
+    if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = "Upload failed: " + data.error; }
+    showToast("Upload failed: " + data.error, 4000);
     return;
   }
 
   DOCS[0].url = data.url || "";
   DOCS[0].s   = "Approved";
+  try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
   filterDocs();
 
   // Reset form
   fileInput.value = "";
   const lbl = document.getElementById("dc-file-name");
   if (lbl) lbl.textContent = "Choose file (.pdf / .docx)";
-  if (statusEl) statusEl.textContent = `Uploaded: ${data.name} → ${path}`;
+  if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = `Uploaded: ${data.name} → ${path}`; }
   showToast(`Uploaded: ${data.name}`);
+};
+
+// ── SharePoint source toggle (recent vs by-site) ──────────────────
+let _spSource = "recent";
+
+window.spSetSource = function (src, btn) {
+  _spSource = src;
+  const recentBtn = document.getElementById("sp-src-recent");
+  const siteBtn   = document.getElementById("sp-src-site");
+  const siteRow   = document.getElementById("sp-site-row");
+  if (recentBtn) { recentBtn.style.background = src === "recent" ? "var(--blue)" : "var(--surface2)"; recentBtn.style.color = src === "recent" ? "#fff" : "var(--muted)"; }
+  if (siteBtn)   { siteBtn.style.background   = src === "site"   ? "var(--blue)" : "var(--surface2)"; siteBtn.style.color   = src === "site"   ? "#fff" : "var(--muted)"; }
+  if (siteRow)   { siteRow.style.display = src === "site" ? "flex" : "none"; }
+  if (src === "site") {
+    const sel = document.getElementById("sp-site-select");
+    if (sel && sel.options.length <= 1) window.loadSpSites(null);
+  }
+};
+
+window.loadSpSites = async function (btn) {
+  const sel      = document.getElementById("sp-site-select");
+  const statusEl = document.getElementById("sp-sync-status");
+  if (!localStorage.getItem("spToken")) {
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.style.background = "var(--surface2)";
+      statusEl.style.color = "var(--text)";
+      statusEl.innerHTML =
+        '<div style="margin-bottom:8px;font-size:13px;font-weight:500"><i class="ti ti-brand-office" style="color:#0078d4"></i> Connect Microsoft 365 to load SharePoint sites</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.6">Go to <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color:var(--blue)">Graph Explorer</a>, sign in with your Microsoft 365 account, then copy the <strong>Access token</strong> from the Auth tab.</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<input id="sp-inline-token" type="password" placeholder="Paste Microsoft 365 access token…" style="flex:1;min-width:200px;margin:0;font-size:12px;font-family:var(--mono)">' +
+        '<button class="sm primary" onclick="spConnectInline()"><i class="ti ti-plug"></i> Connect &amp; Load</button>' +
+        '</div>';
+    }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i>'; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Loading SharePoint sites…"; }
+  const data = await api.spSites();
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Load sites'; }
+  if (data.error) {
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = "Sites error: " + data.error; }
+    showToast("Sites error: " + data.error);
+    return;
+  }
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select a site —</option>';
+  (data.sites || []).forEach(function (s) {
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.name; sel.appendChild(opt);
+  });
+  const src = data.source === "root" ? " (root only — add Sites.Read.All for full list)" : data.source === "followed" ? " (followed sites)" : "";
+  const msg = "Loaded " + (data.sites || []).length + " site(s)" + src;
+  if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green-text)"; statusEl.textContent = msg; }
+  showToast(msg);
+};
+
+window.spOnSiteChange = function () {
+  const siteId = document.getElementById("sp-site-select")?.value;
+  if (siteId) window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
+};
+
+// ── Connect M365 token inline from Documents panel ────────────────
+window.spConnectInline = function () {
+  const inp = document.getElementById("sp-inline-token");
+  const val = inp ? inp.value.trim() : "";
+  if (!val) { showToast("Paste your Microsoft 365 token first."); return; }
+  localStorage.setItem("spToken", val);
+  updateTokenUI();
+  if (typeof scheduleTokenRefreshTimer === "function") scheduleTokenRefreshTimer(val);
+  showToast("Microsoft 365 connected.");
+  const statusEl = document.getElementById("sp-sync-status");
+  if (statusEl) statusEl.innerHTML = "";
+  // If in site mode, load sites; otherwise sync recent files
+  if (_spSource === "site") {
+    window.loadSpSites(document.getElementById("sp-sync-btn"));
+  } else {
+    window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
+  }
+};
+
+// ── Sync documents from SharePoint (Microsoft Graph API) ──────────
+window.syncSharePointDocs = async function (btn) {
+  const token = localStorage.getItem("spToken") || "";
+  const statusEl = document.getElementById("sp-sync-status");
+  const userEl   = document.getElementById("sp-sync-user");
+
+  if (!token) {
+    if (statusEl) {
+      statusEl.style.display = "block";
+      statusEl.style.background = "var(--surface2)";
+      statusEl.style.color = "var(--text)";
+      statusEl.innerHTML =
+        '<div style="margin-bottom:10px;font-size:13px;font-weight:500"><i class="ti ti-brand-office" style="color:#0078d4"></i> Connect Microsoft 365 to fetch your SharePoint documents</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">Get a token from <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color:var(--blue)">Graph Explorer</a> → sign in → copy the <strong>Access token</strong> tab.</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<input id="sp-inline-token" type="password" placeholder="Paste Microsoft 365 access token here…" style="flex:1;min-width:200px;margin:0;font-size:12px;font-family:var(--mono)">' +
+        '<button class="sm primary" onclick="spConnectInline()"><i class="ti ti-plug"></i> Connect</button>' +
+        '</div>';
+    }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Syncing…'; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Fetching files from SharePoint…"; }
+
+  // Branch: recent files (OneDrive) OR site document libraries
+  let data;
+  if (_spSource === "site") {
+    const siteId = document.getElementById("sp-site-select")?.value;
+    if (!siteId) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync'; }
+      if (statusEl) { statusEl.textContent = "Select a site first."; }
+      return;
+    }
+    if (statusEl) statusEl.textContent = "Fetching document libraries from site…";
+    data = await api.spSiteFiles(siteId);
+  } else {
+    data = await api.spFiles();
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync'; }
+
+  if (data.error) {
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = data.error; }
+    return;
+  }
+
+  const spFiles = data.files || [];
+  const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const existingSpIds = new Set(DOCS.filter(function(d) { return d._spId; }).map(function(d) { return d._spId; }));
+  let added = 0, updated = 0;
+
+  spFiles.forEach(function(f) {
+    const modified = f.modified ? new Date(f.modified).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : today;
+    const extMatch = f.name.match(/\.(\w+)$/);
+    const ext = extMatch ? extMatch[1].toLowerCase() : "";
+    const status = (ext === "pdf" || ext === "docx" || ext === "doc") ? "Approved" : "Pending";
+    if (existingSpIds.has(f.id)) {
+      const idx = DOCS.findIndex(function(d) { return d._spId === f.id; });
+      if (idx >= 0) { DOCS[idx].d = modified; DOCS[idx].url = f.webUrl; updated++; }
+    } else {
+      DOCS.unshift({ n: f.name, v: "v1.0", s: status, d: modified, desc: "SharePoint — " + f.folder, url: f.webUrl, _spId: f.id });
+      added++;
+    }
+  });
+
+  try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
+  filterDocs();
+
+  const srcLabel = _spSource === "site" ? ("site (" + (data.libCount || 0) + " libraries)") : "OneDrive recent";
+  const msg = "Synced " + spFiles.length + " file(s) from " + srcLabel + " — " + added + " new, " + updated + " updated.";
+  if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green-text)"; statusEl.textContent = msg; }
+  if (userEl)   { const uname = localStorage.getItem("ewsUsername") || ""; if (uname) userEl.textContent = uname; }
+  showToast(msg);
 };
 
 // Upload via SharePoint (legacy — called from documents.js row menu)
@@ -504,15 +721,17 @@ function getMsToken() {
   return localStorage.getItem("spToken") || "";
 }
 function updateTokenUI() {
-  const tok    = getMsToken();
-  const badge  = document.getElementById("tm-connected-badge");
-  const hint   = document.getElementById("ol-token-hint");
-  const ok     = document.getElementById("ol-token-ok");
-  const inp    = document.getElementById("ms-token-input");
-  if (badge) badge.style.display = tok ? "inline-flex" : "none";
-  if (hint)  hint.style.display  = tok ? "none"        : "inline";
-  if (ok)    ok.style.display    = tok ? "inline"      : "none";
+  const tok         = getMsToken();
+  const badge       = document.getElementById("tm-connected-badge");
+  const hint        = document.getElementById("ol-token-hint");
+  const ok          = document.getElementById("ol-token-ok");
+  const inp         = document.getElementById("ms-token-input");
+  const dcHint      = document.getElementById("dc-connect-hint");
+  if (badge)  badge.style.display  = tok ? "inline-flex" : "none";
+  if (hint)   hint.style.display   = tok ? "none"        : "inline";
+  if (ok)     ok.style.display     = tok ? "inline"      : "none";
   if (inp && !inp.value && tok)  inp.value = tok;
+  if (dcHint) dcHint.style.display = tok ? "none"        : "block";
 }
 window.connectMsToken = function () {
   const val = document.getElementById("ms-token-input")?.value?.trim();
@@ -787,6 +1006,29 @@ function ewsGetCreds() {
     password: localStorage.getItem("ewsPassword") || "",
   };
 }
+function extractFirstName(username) {
+  const local = username.includes("@") ? username.split("@")[0] : username;
+  const first = local.split(/[.\-_]/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+window.updateWelcomeMessage = function () {
+  const firstName = localStorage.getItem("firstName") || "";
+  const el = document.getElementById("tb-welcome");
+  if (!el) return;
+  if (firstName) { el.textContent = `Welcome, ${firstName}`; el.style.display = "block"; }
+  else { el.style.display = "none"; }
+};
+
+function showOvMain() {
+  const el = document.getElementById("ov-main-content");
+  if (el) el.style.display = "block";
+  const prompt = document.getElementById("ov-setup-prompt");
+  if (prompt) prompt.style.display = "none";
+  const hint = document.getElementById("ov-setup-hint");
+  if (hint) hint.style.display = "none";
+}
+
 function ewsRestoreUI() {
   const { ewsUrl, username } = ewsGetCreds();
   const setupEl     = document.getElementById("ews-setup-form");
@@ -1053,6 +1295,12 @@ window.ewsConnect = async function (btn) {
   }
 
   ewsSaveCreds(url, username, password);
+
+  // Save first name for welcome message
+  const firstName = extractFirstName(username);
+  localStorage.setItem("firstName", firstName);
+  window.updateWelcomeMessage();
+
   // Remove login-mode so sidebar + topbar reappear
   document.getElementById("app")?.classList.remove("login-mode");
   stopTmBackground();
@@ -1065,8 +1313,11 @@ window.ewsConnect = async function (btn) {
 
   showToast(`Connected! Loaded ${_ewsMeetings.length} meeting(s).`);
 
-  // Redirect to Dashboard after successful connection
+  // Redirect to Dashboard — show full content only if project already set
   navTo("ov");
+  if (localStorage.getItem("projectName")) {
+    showOvMain();
+  }
 };
 
 window.ewsSync = async function (btn) {
@@ -1101,6 +1352,18 @@ window.ewsDisconnect = function () {
   const countEl = document.getElementById("meetings-count");
   if (countEl) countEl.style.display = "none";
   document.getElementById("app")?.classList.add("login-mode");
+  // Clear welcome + reset setup state for next login
+  localStorage.removeItem("firstName");
+  localStorage.removeItem("projectName");
+  window.updateWelcomeMessage();
+  const ovMain = document.getElementById("ov-main-content");
+  if (ovMain) ovMain.style.display = "none";
+  const ovPrompt = document.getElementById("ov-setup-prompt");
+  if (ovPrompt) ovPrompt.style.display = "flex";
+  const sbProj = document.getElementById("sb-project-name");
+  if (sbProj) { sbProj.textContent = ""; sbProj.style.display = "none"; }
+  const projInp = document.getElementById("ov-project");
+  if (projInp) projInp.value = "";
   ewsRestoreUI();
   navTo("tm");
   startTmBackground();
@@ -1332,8 +1595,8 @@ async function previewEWSEmail(email, row, creds) {
       <div style="font-size:12px;color:var(--muted)"><strong>From:</strong> ${escHtml(from)}${fromAddress ? " &lt;" + escHtml(fromAddress) + "&gt;" : ""}</div>
       <div style="font-size:12px;color:var(--muted)"><strong>Date:</strong> ${dateStr}</div>
     </div>
-    <div id="ol-body-content" style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;min-height:60px;margin-bottom:12px">
-      <span class="ldot" style="background:var(--blue)"></span> Loading full email...
+    <div id="ol-body-content" style="min-height:60px;margin-bottom:12px;border-radius:var(--r-sm);overflow:hidden">
+      <div style="font-size:12px;color:var(--muted);padding:10px 0"><span class="ldot" style="background:var(--blue)"></span> Loading full email...</div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <button class="sm primary" onclick="startEmailCompose('reply')"><i class="ti ti-arrow-back-up"></i> Reply</button>
@@ -1358,11 +1621,28 @@ async function previewEWSEmail(email, row, creds) {
 
   if (email.id && creds) {
     const bodyData = await api.ewsEmailBody({ ...creds, itemId: email.id, changeKey: email.changeKey });
-    const bodyText = bodyData.body || "(no content)";
     const bodyEl   = document.getElementById("ol-body-content");
-    if (bodyEl) bodyEl.textContent = bodyText;
-    _currentEmail.bodyFull    = bodyText;
-    _currentEmail.bodyPreview = bodyText.slice(0, 500);
+    const content  = bodyData.body || "(no content)";
+    const isHtml   = bodyData.bodyType === "html" || /<[a-z][\s\S]*>/i.test(content);
+    if (bodyEl) {
+      if (isHtml) {
+        const iframe = document.createElement("iframe");
+        iframe.sandbox = "allow-same-origin allow-popups";
+        iframe.style.cssText = "width:100%;border:none;min-height:300px;border-radius:var(--r-sm);background:#fff";
+        iframe.srcdoc = content;
+        iframe.onload = () => {
+          const h = iframe.contentDocument?.body?.scrollHeight;
+          if (h) iframe.style.height = h + 20 + "px";
+        };
+        bodyEl.innerHTML = "";
+        bodyEl.appendChild(iframe);
+      } else {
+        bodyEl.style.cssText = "font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;padding:8px 0;margin-bottom:12px";
+        bodyEl.textContent = content;
+      }
+    }
+    _currentEmail.bodyFull    = content;
+    _currentEmail.bodyPreview = content.replace(/<[^>]+>/g, "").slice(0, 500);
   }
 }
 
@@ -1392,28 +1672,61 @@ window.startEmailCompose = function (type) {
   toEl.focus();
 };
 
+window.showOlCompose = function () {
+  const area = document.getElementById("ol-compose-area");
+  if (!area) return;
+  area.style.display = "block";
+  document.getElementById("ol-compose-to")?.focus();
+};
+
+window.aiDraftCompose = async function () {
+  const subject = document.getElementById("ol-compose-subject")?.value?.trim();
+  const to      = document.getElementById("ol-compose-to")?.value?.trim();
+  const bodyEl  = document.getElementById("ol-compose-body");
+  if (!subject) { showToast("Enter a subject first so the AI can draft the email."); return; }
+  if (bodyEl) bodyEl.value = "Drafting…";
+  const data = await api.chat(`Write a professional email with subject: "${subject}"${to ? " to " + to : ""}. Include a greeting, clear body, and professional closing. Do not include subject line in the body.`, "You write concise professional workplace emails.");
+  if (bodyEl) bodyEl.value = data.text || data.error || "";
+};
+
 window.sendComposedEmail = async function (btn) {
   const to      = document.getElementById("ol-compose-to")?.value?.trim();
+  const cc      = document.getElementById("ol-compose-cc")?.value?.trim();
   const subject = document.getElementById("ol-compose-subject")?.value?.trim();
   const body    = document.getElementById("ol-compose-body")?.value?.trim();
+  const statusEl = document.getElementById("ol-compose-status");
+
   if (!to)      { showToast("Enter a recipient email."); return; }
   if (!subject) { showToast("Enter a subject."); return; }
+  if (!body)    { showToast("Message body is empty."); return; }
 
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Sending...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i> Sending…'; }
+  if (statusEl) { statusEl.style.display = "block"; statusEl.style.background = "var(--surface2)"; statusEl.style.color = "var(--muted)"; statusEl.textContent = "Sending via Exchange…"; }
 
   const creds = ewsGetCreds();
-  const data  = creds.ewsUrl
-    ? await api.ewsSendEmail({ ...creds, to, subject, body })
-    : await api.outlookSend({ to, subject, body });
+  if (!creds.ewsUrl) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Send Email'; }
+    if (statusEl) { statusEl.style.background = "rgba(220,150,0,.1)"; statusEl.style.color = "var(--orange,#d97706)"; statusEl.textContent = "⚠ Not connected to Exchange. Connect in the Teams panel first."; }
+    return;
+  }
 
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Send'; }
+  const data = await api.ewsSendEmail({ ...creds, to, cc, subject, body });
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Send Email'; }
 
   if (data.ok) {
-    showToast("Email sent!");
-    const area = document.getElementById("ol-compose-area");
-    if (area) area.style.display = "none";
+    if (statusEl) { statusEl.style.background = "var(--green-bg)"; statusEl.style.color = "var(--green)"; statusEl.textContent = `✓ Email sent to ${to}`; }
+    showToast(`Email sent to ${to}!`);
+    setTimeout(() => {
+      document.getElementById("ol-compose-to").value      = "";
+      document.getElementById("ol-compose-cc").value      = "";
+      document.getElementById("ol-compose-subject").value = "";
+      document.getElementById("ol-compose-body").value    = "";
+      if (statusEl) statusEl.style.display = "none";
+    }, 2000);
   } else {
-    showToast("Send failed: " + (data.error || "Unknown error"));
+    if (statusEl) { statusEl.style.background = "rgba(220,38,38,.07)"; statusEl.style.color = "var(--red)"; statusEl.textContent = `✗ ${data.error || "Send failed"}`; }
+    showToast("Send failed: " + (data.error || "Unknown error"), 5000);
   }
 };
 
@@ -1493,14 +1806,49 @@ window.syncOutlookEmails = async function (btn) {
     list.appendChild(row);
   });
 };
-function previewEmail(email, row) {
+async function previewEmail(email, row) {
   document.querySelectorAll("#ol-list .meet-row").forEach((r) => r.classList.remove("sel"));
   row.classList.add("sel");
   _currentEmail = email;
   const det = document.getElementById("ol-detail");
   if (!det) return;
   const from = email.from?.emailAddress?.name || email.from?.emailAddress?.address || "Unknown";
-  det.innerHTML = `<div style="font-size:14px;font-weight:500;margin-bottom:4px">${escHtml(email.subject || "(no subject)")}</div><div style="font-size:12px;color:var(--muted);margin-bottom:8px">From: ${escHtml(from)} · ${new Date(email.receivedDateTime).toLocaleString("en-IN")}</div><div style="font-size:13px;color:var(--muted);margin-bottom:10px">${escHtml(email.bodyPreview || "")}</div><button class="primary sm" onclick="draftEmailReply()"><i class="ti ti-robot"></i> AI Draft Reply</button>`;
+  det.innerHTML = `
+    <div style="border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px">
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:5px">${escHtml(email.subject || "(no subject)")}</div>
+      <div style="font-size:12px;color:var(--muted)"><strong>From:</strong> ${escHtml(from)}</div>
+      <div style="font-size:12px;color:var(--muted)"><strong>Date:</strong> ${new Date(email.receivedDateTime).toLocaleString("en-IN")}</div>
+    </div>
+    <div id="ol-body-m365" style="min-height:80px;margin-bottom:12px;border-radius:var(--r-sm);overflow:hidden">
+      <div style="font-size:12px;color:var(--muted);padding:8px 0"><span class="ldot" style="background:var(--blue)"></span> Loading...</div>
+    </div>
+    <button class="primary sm" onclick="draftEmailReply()"><i class="ti ti-robot"></i> AI Draft Reply</button>`;
+
+  if (email.id) {
+    const data    = await api.outlookEmailBody(email.id);
+    const content = data.body || email.bodyPreview || "(no content)";
+    const isHtml  = (data.bodyType || "").toLowerCase() === "html" || /<[a-z][\s\S]*>/i.test(content);
+    const bodyEl  = document.getElementById("ol-body-m365");
+    if (bodyEl) {
+      if (isHtml) {
+        const iframe = document.createElement("iframe");
+        iframe.sandbox = "allow-same-origin allow-popups";
+        iframe.style.cssText = "width:100%;border:none;min-height:300px;border-radius:var(--r-sm);background:#fff";
+        iframe.srcdoc = content;
+        iframe.onload = () => {
+          const h = iframe.contentDocument?.body?.scrollHeight;
+          if (h) iframe.style.height = h + 20 + "px";
+        };
+        bodyEl.innerHTML = "";
+        bodyEl.appendChild(iframe);
+      } else {
+        bodyEl.style.cssText = "font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;padding:8px 0";
+        bodyEl.textContent = content;
+      }
+    }
+    _currentEmail.bodyFull    = content;
+    _currentEmail.bodyPreview = content.replace(/<[^>]+>/g, "").slice(0, 500);
+  }
 }
 window.draftEmailReply = async function () {
   if (!_currentEmail) return;
@@ -1520,11 +1868,14 @@ window.sendOutlookDraft = async function () {
   if (!_currentEmail) return;
   const txt = document.getElementById("ol-draft-text")?.innerText || "";
   if (!txt) { showToast("Draft is empty."); return; }
-  const to = _currentEmail.from?.emailAddress?.address  // M365
-           || _currentEmail.from?.address;              // EWS
+  const to = _currentEmail.from?.emailAddress?.address || _currentEmail.from?.address;
   if (!to) { showToast("Cannot determine reply-to address."); return; }
-  const data = await api.outlookSend({ to, subject: "Re: " + (_currentEmail.subject || ""), body: txt });
-  showToast(data.ok ? "Email sent!" : "Send failed: " + data.error);
+  const subject = "Re: " + (_currentEmail.subject || "");
+  const creds = ewsGetCreds();
+  const data = creds.ewsUrl
+    ? await api.ewsSendEmail({ ...creds, to, subject, body: txt })
+    : await api.outlookSend({ to, subject, body: txt });
+  showToast(data.ok ? `Reply sent to ${to}!` : "Send failed: " + data.error);
 };
 window.sendViaTeams = function () {
   if (!_currentEmail) return;
@@ -1568,12 +1919,17 @@ window.generateReport = async function () {
   card.style.display = "block";
   t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating report with ${labels[provider] || provider}…`;
   card.scrollIntoView({ behavior: "smooth", block: "start" });
+  let standupHistory = [];
+  try { standupHistory = JSON.parse(localStorage.getItem("su_history") || "[]"); } catch {}
   const data = await api.generateReport({
-    name:      document.getElementById("rp-name")?.value,
-    dept:      document.getElementById("rp-dept")?.value,
-    startTime: document.getElementById("rp-start")?.value,
-    endTime:   document.getElementById("rp-end")?.value,
-    context:   document.getElementById("rp-context")?.value,
+    name:           document.getElementById("rp-name")?.value,
+    dept:           document.getElementById("rp-dept")?.value,
+    role:           getMyRole(),
+    project:        localStorage.getItem("projectName") || "",
+    startTime:      document.getElementById("rp-start")?.value,
+    endTime:        document.getElementById("rp-end")?.value,
+    context:        document.getElementById("rp-context")?.value,
+    standupHistory,
     provider,
   });
   typeIn(t, data.text || data.error || "Error generating report");
@@ -1840,14 +2196,28 @@ window.generateStandup = async function () {
   const t = document.getElementById("su-output");
   if (!t) return;
   t.innerHTML = `<span class="ldot" style="background:var(--blue)"></span>Generating stand-up...`;
-  const done     = document.getElementById("su-done")?.value    || "";
-  const today    = document.getElementById("su-today")?.value   || "";
+  const done     = document.getElementById("su-done")?.value     || "";
+  const today    = document.getElementById("su-today")?.value    || "";
   const blockers = document.getElementById("su-blockers")?.value || "";
-  const format   = document.getElementById("su-format")?.value  || "";
-  const data = await api.generateStandup({ done, today, blockers, format, name: "Aditya S" });
+  const tone     = document.getElementById("su-format")?.value   || "casual";
+  const name     = getDisplayName();
+  const role     = getMyRole();
+  const project  = localStorage.getItem("projectName") || "";
+  const provider = localStorage.getItem("ai_provider") || "groq";
+  const data = await api.generateStandup({ done, today, blockers, tone, name, role, project, provider });
   typeIn(t, data.text || data.error);
   if (data.text) {
-    _standupCtx = { done, today, blockers, standupText: data.text };
+    _standupCtx = { done, today, blockers, standupText: data.text, name, role };
+    // Save to standup history for weekly report
+    const entry = { date: new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }), done, today, blockers };
+    try {
+      const hist = JSON.parse(localStorage.getItem("su_history") || "[]");
+      hist.unshift(entry);
+      localStorage.setItem("su_history", JSON.stringify(hist.slice(0, 20)));
+    } catch {}
+    // Save for "Load yesterday" feature
+    localStorage.setItem("su_prev_done",  done);
+    localStorage.setItem("su_prev_today", today);
     const qaSection = document.getElementById("su-qa-section");
     if (qaSection) {
       document.getElementById("su-qa-history").innerHTML = "";
@@ -1857,10 +2227,13 @@ window.generateStandup = async function () {
   }
 };
 window.loadYesterday = function () {
-  const done  = document.getElementById("su-done");
-  const today = document.getElementById("su-today");
-  if (done)  done.value  = "Completed EEL Bug Portal customer & admin console. Applied ESDS doc policy to GPOS BRD v1.1/v1.2.";
-  if (today) today.value = "Working on SharePoint export integration for weekly reports. Reviewing GPOS BRD v1.2 changes.";
+  const doneEl  = document.getElementById("su-done");
+  const todayEl = document.getElementById("su-today");
+  const prevDone  = localStorage.getItem("su_prev_done")  || "";
+  const prevToday = localStorage.getItem("su_prev_today") || "";
+  if (doneEl  && prevToday) doneEl.value  = prevToday;
+  if (todayEl && prevDone)  todayEl.value = "";
+  if (!prevDone && !prevToday) showToast("No previous stand-up found — fill in the fields manually.");
 };
 window.standupQA = async function () {
   const input   = document.getElementById("su-qa-input");
@@ -1883,7 +2256,7 @@ window.standupQA = async function () {
   history.appendChild(aEl);
   history.scrollTop = history.scrollHeight;
 
-  const data = await api.standupQA({ ..._standupCtx, question });
+  const data = await api.standupQA({ ..._standupCtx, question, name: _standupCtx?.name || getDisplayName() });
 
   const ansEl = aEl.querySelector(".su-qa-ans");
   if (ansEl) typeIn(ansEl, data.answer || data.error);
@@ -1912,49 +2285,200 @@ function _suRenderSuggestions() {
 // ── Leave & Resources ──────────────────────────────────────────
 // ── Team members (leave register) ──────────────────────────────
 const LV_KEY = "teamMembers";
-function lvLoadMembers() { try { return JSON.parse(localStorage.getItem(LV_KEY) || "[]"); } catch { return []; } }
-function lvSaveMembers(arr) { localStorage.setItem(LV_KEY, JSON.stringify(arr)); }
+let _lvCache = [];
+function lvLoadMembers() { return _lvCache.length ? _lvCache : (()=>{ try { _lvCache = JSON.parse(localStorage.getItem(LV_KEY) || "[]"); return _lvCache; } catch { return []; } })(); }
+function lvSaveMembers(arr) { _lvCache = arr; localStorage.setItem(LV_KEY, JSON.stringify(arr)); }
 
-function renderStakeholders() {
+async function lvFetchFromServer() {
+  try {
+    const data = await api.teamMembers();
+    if (data && Array.isArray(data.members)) {
+      _lvCache = data.members;
+      localStorage.setItem(LV_KEY, JSON.stringify(_lvCache));
+    }
+  } catch {}
+}
+
+let _lvPollTimer = null;
+function lvStartPolling() {
+  if (_lvPollTimer) return;
+  _lvPollTimer = setInterval(async () => {
+    await lvFetchFromServer();
+    refreshLeaveCards();
+  }, 30000);
+}
+function lvStopPolling() {
+  if (_lvPollTimer) { clearInterval(_lvPollTimer); _lvPollTimer = null; }
+}
+
+function computeCurrentStatus(member) {
+  // If member has leave dates, check if today falls within range
+  if (member.leaveFrom && member.leaveTo) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const from  = new Date(member.leaveFrom);
+    const to    = new Date(member.leaveTo);
+    if (today >= from && today <= to) return "on-leave";
+    if (today > to) return "available";
+  }
+  return member.status || "available";
+}
+
+function autoComputeStatuses() {
+  const members = lvLoadMembers();
+  let changed = false;
+  members.forEach(m => {
+    const computed = computeCurrentStatus(m);
+    if (computed !== m.status) { m.status = computed; changed = true; }
+  });
+  if (changed) lvSaveMembers(members);
+}
+
+function refreshLeaveCards() {
+  autoComputeStatuses();
+  renderStakeholders();
+  populateMemberSelect();
+}
+
+function populateMemberSelect() {
+  const sel = document.getElementById("lv-member-select");
+  if (!sel) return;
+  const members = lvLoadMembers();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— select team member —</option>' +
+    members.map((m, i) => `<option value="${i}">${escHtml(m.name)} (${escHtml(m.role)})</option>`).join("");
+  if (cur) sel.value = cur;
+}
+
+function renderStakeholders(preloaded) {
   const tbody  = document.getElementById("stakeholder-tbody");
   const empty  = document.getElementById("lv-empty-row");
   if (!tbody) return;
-  const members = lvLoadMembers();
-  // remove all dynamic rows
+  const members = preloaded || lvLoadMembers();
   tbody.querySelectorAll("tr.lv-member-row").forEach(r => r.remove());
   if (empty) empty.style.display = members.length ? "none" : "";
   members.forEach((m, i) => {
+    const onLeave = m.status === "on-leave";
+    const badge = onLeave
+      ? '<span class="badge b-amber">On Leave</span>'
+      : '<span class="badge b-green">Available</span>';
     const tr = document.createElement("tr");
     tr.className = "lv-member-row";
-    tr.innerHTML = `<td>${i + 1}</td><td>${escHtml(m.name)}</td><td>${escHtml(m.role)}</td><td><span class="badge b-blue">${escHtml(m.type)}</span></td><td><span class="badge b-green">Available</span></td><td><button class="sm" style="padding:2px 7px" onclick="removeTeamMember(${i})"><i class="ti ti-x" style="font-size:11px"></i></button></td>`;
+    tr.dataset.idx = i;
+    tr.innerHTML = '<td>' + (i + 1) + '</td><td style="font-weight:500">' + escHtml(m.name) + '</td><td>' + escHtml(m.role) + '</td><td>' + badge + '</td><td><button class="sm lv-menu-btn" data-mi="' + i + '" onclick="lvToggleMenu(this,' + i + ')" style="padding:2px 10px;font-size:18px;line-height:1;letter-spacing:2px;border-radius:6px;min-width:34px">⋯</button></td>';
     tbody.appendChild(tr);
   });
-  // update stat cards
-  const avail = document.getElementById("lv-avail-count");
-  const total = document.getElementById("lv-total-sub");
-  if (avail) avail.textContent = members.length;
-  if (total) total.textContent = `of ${members.length} member${members.length !== 1 ? "s" : ""}`;
+  const availCount  = members.filter(m => m.status !== "on-leave").length;
+  const leaveCount  = members.filter(m => m.status === "on-leave").length;
+  const leaveNames  = members.filter(m => m.status === "on-leave").map(m => m.name).join(", ") || "—";
+  const availEl     = document.getElementById("lv-avail-count");
+  const totalEl     = document.getElementById("lv-total-sub");
+  const leaveEl     = document.getElementById("lv-leave-count");
+  const leaveNamesEl = document.getElementById("lv-leave-names");
+  if (availEl)     availEl.textContent = availCount;
+  if (totalEl)     totalEl.textContent = `of ${members.length} member${members.length !== 1 ? "s" : ""}`;
+  if (leaveEl)     leaveEl.textContent = leaveCount;
+  if (leaveNamesEl) leaveNamesEl.textContent = leaveNames;
 }
 
 window.addTeamMember = function () {
   const name = document.getElementById("lv-new-name")?.value?.trim();
   const role = document.getElementById("lv-new-role")?.value?.trim();
-  const type = document.getElementById("lv-new-type")?.value || "Full Time";
   if (!name) { showToast("Enter a name."); return; }
+  if (!role) { showToast("Enter a role."); return; }
   const members = lvLoadMembers();
-  members.push({ name, role: role || "—", type });
+  members.push({ name, role, status: "available" });
   lvSaveMembers(members);
   document.getElementById("lv-new-name").value = "";
   document.getElementById("lv-new-role").value = "";
-  renderStakeholders();
+  document.getElementById("lv-new-name").focus();
+  refreshLeaveCards();
+  showToast(`Team member "${name}" added successfully.`);
 };
+
+window.renderStakeholders = renderStakeholders;
 
 window.removeTeamMember = function (i) {
   const members = lvLoadMembers();
+  const removed = members[i]?.name || "Member";
   members.splice(i, 1);
   lvSaveMembers(members);
-  renderStakeholders();
+  lvCloseMenu();
+  refreshLeaveCards();
+  showToast('"' + removed + '" removed from team.');
 };
+
+// ── Singleton action menu (fixed-position, avoids overflow:hidden clipping) ──
+let _lvMenuIdx = -1;
+function lvGetMenuEl() {
+  let el = document.getElementById("lv-action-menu");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "lv-action-menu";
+    document.body.appendChild(el);
+  }
+  el.style.cssText = "display:none;position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);min-width:140px;overflow:hidden";
+  return el;
+}
+function lvCloseMenu() {
+  const el = document.getElementById("lv-action-menu");
+  if (el) el.style.display = "none";
+  _lvMenuIdx = -1;
+}
+
+window.lvToggleMenu = function (btn, i) {
+  const existing = document.getElementById("lv-action-menu");
+  if (_lvMenuIdx === i && existing && existing.style.display !== "none") { lvCloseMenu(); return; }
+  const menu = lvGetMenuEl();
+  _lvMenuIdx = i;
+  const btnStyle = "width:100%;text-align:left;padding:8px 14px;background:none;border:none;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;";
+  menu.innerHTML =
+    '<button onclick="editTeamMember(' + i + ')" style="' + btnStyle + 'color:var(--text)"><i class="ti ti-pencil"></i> Edit</button>'
+    + '<div style="height:1px;background:var(--border);margin:2px 0"></div>'
+    + '<button onclick="removeTeamMember(' + i + ')" style="' + btnStyle + 'color:var(--red)"><i class="ti ti-trash"></i> Delete</button>';
+  const rect = btn.getBoundingClientRect();
+  menu.style.display = "block";
+  const mw = menu.offsetWidth;
+  let left = rect.right - mw;
+  if (left < 8) left = 8;
+  menu.style.top  = (rect.bottom + 4) + "px";
+  menu.style.left = left + "px";
+  menu.style.right = "auto";
+};
+
+window.editTeamMember = function (i) {
+  lvCloseMenu();
+  const members = lvLoadMembers();
+  const m = members[i];
+  if (!m) return;
+  const tr = document.querySelector("tr.lv-member-row[data-idx='" + i + "']");
+  if (!tr) return;
+  tr.innerHTML =
+    '<td>' + (i + 1) + '</td>'
+    + '<td><input id="lv-edit-name-' + i + '" value="' + escHtml(m.name) + '" style="margin:0;padding:4px 8px;font-size:12px;width:100%"></td>'
+    + '<td><input id="lv-edit-role-' + i + '" value="' + escHtml(m.role) + '" style="margin:0;padding:4px 8px;font-size:12px;width:100%"></td>'
+    + '<td><select id="lv-edit-status-' + i + '" style="margin:0;padding:4px 8px;font-size:12px;width:100%"><option value="available"' + (m.status !== "on-leave" ? " selected" : "") + '>Available</option><option value="on-leave"' + (m.status === "on-leave" ? " selected" : "") + '>On Leave</option></select></td>'
+    + '<td style="display:flex;gap:4px;padding:6px 4px"><button class="sm primary" onclick="saveTeamMember(' + i + ')" style="padding:3px 10px;font-size:12px">Save</button><button class="sm" onclick="window.renderStakeholders()" style="padding:3px 8px;font-size:12px">Cancel</button></td>';
+};
+
+window.saveTeamMember = function (i) {
+  const name   = document.getElementById("lv-edit-name-" + i)?.value?.trim();
+  const role   = document.getElementById("lv-edit-role-" + i)?.value?.trim();
+  const status = document.getElementById("lv-edit-status-" + i)?.value || "available";
+  if (!name) { showToast("Name cannot be empty."); return; }
+  if (!role)  { showToast("Role cannot be empty."); return; }
+  const members = lvLoadMembers();
+  if (!members[i]) return;
+  members[i] = { ...members[i], name, role, status };
+  lvSaveMembers(members);
+  refreshLeaveCards();
+  showToast(name + " updated.");
+};
+
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".lv-menu-btn") && !e.target.closest("#lv-action-menu")) {
+    lvCloseMenu();
+  }
+});
 
 // set today as default leave dates and load saved emails
 (function initLeaveForm() {
@@ -1971,7 +2495,7 @@ window.removeTeamMember = function (i) {
   // persist email changes
   document.getElementById("lv-to-email")?.addEventListener("change", e => localStorage.setItem("lv_mgr_email", e.target.value));
   document.getElementById("lv-cc-email")?.addEventListener("change", e => localStorage.setItem("lv_hr_email",  e.target.value));
-  renderStakeholders();
+  lvFetchFromServer().then(() => refreshLeaveCards());
 })();
 
 window.syncLeaveFromExchange = async function (btn) {
@@ -2012,6 +2536,38 @@ window.syncLeaveFromExchange = async function (btn) {
   showToast(`Leave sync complete — ${meetings.length} events loaded.`);
 };
 
+window.applyLeave = async function () {
+  const fromDate   = document.getElementById("lv-from")?.value || "";
+  const toDate     = document.getElementById("lv-to")?.value   || "";
+  const leaveType  = document.getElementById("lv-type")?.value || "Planned leave";
+  const senderName = getDisplayName();
+
+  if (!fromDate) { showToast("Select a leave start date."); return; }
+  if (!senderName) { showToast("Enter your name in the Weekly Report name field first."); return; }
+
+  // Mark the person on leave in the team members list
+  const members = lvLoadMembers();
+  const idx = members.findIndex(mb => mb.name.toLowerCase() === senderName.toLowerCase());
+  if (idx !== -1) {
+    members[idx].status    = "on-leave";
+    members[idx].leaveFrom = fromDate;
+    members[idx].leaveTo   = toDate || fromDate;
+  } else {
+    // Auto-add self if not in list
+    members.push({ name: senderName, role: localStorage.getItem("rp_role") || "Team Member", status: "on-leave", leaveFrom: fromDate, leaveTo: toDate || fromDate });
+  }
+  lvSaveMembers(members);
+
+  // Persist to server
+  try { await api.saveTeamMembers(members); } catch {}
+
+  refreshLeaveCards();
+
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+  const range = fromDate === toDate ? fmt(fromDate) : `${fmt(fromDate)} – ${fmt(toDate)}`;
+  showToast(`Leave applied for ${senderName}: ${range}`);
+};
+
 window.generateLeaveEmail = async function () {
   const t        = document.getElementById("lv-output");
   const controls = document.getElementById("lv-email-controls");
@@ -2029,13 +2585,15 @@ window.generateLeaveEmail = async function () {
   const toEmail   = document.getElementById("lv-to-email")?.value?.trim() || "";
   const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : d;
   const dateRange = fromDate === toDate ? fmt(fromDate) : `${fmt(fromDate)} to ${fmt(toDate)}`;
-  const senderName = document.getElementById("rp-name")?.value?.trim() || localStorage.getItem("userName") || "Team Member";
+  const senderName = getDisplayName() || "Team Member";
+  const project    = localStorage.getItem("projectName") || "";
+  const projectCtx = project ? ` Currently working on the ${project} project.` : "";
   const prompt = `Write a formal, professional ${leaveType.toLowerCase()} request email from ${senderName} (ESDS Software Solution Pvt. Ltd.)` +
     ` for dates: ${dateRange}.` +
     (reason ? ` Reason: ${reason}.` : "") +
-    ` To: ${toEmail || "Manager"}.` +
+    ` To: ${toEmail || "Manager"}.${projectCtx}` +
     ` Include: polite greeting, specific leave dates, brief reason, assurance of work handover, request for approval, and a thank-you close. Do not include a subject line. Use a professional letter format with proper paragraph spacing.`;
-  const data = await api.chat(prompt, "You write formal, courteous workplace emails in proper letter format.");
+  const data = await api.chat(prompt, "You write formal, courteous workplace emails in proper letter format.", null, getWorkContext());
   const text = data.text || data.error || "";
   t.setAttribute("contenteditable", "true");
   typeIn(t, text);
@@ -2078,6 +2636,18 @@ window.sendLeaveEmail = async function (btn) {
 
   if (data.ok) {
     showToast("Leave email sent via Outlook!");
+    // Auto-mark matching team member as On Leave
+    const senderName = document.getElementById("rp-name")?.value?.trim() || "";
+    if (senderName) {
+      const members = lvLoadMembers();
+      const idx = members.findIndex(function (mb) { return mb.name.toLowerCase() === senderName.toLowerCase(); });
+      if (idx !== -1 && members[idx].status !== "on-leave") {
+        members[idx].status = "on-leave";
+        lvSaveMembers(members);
+        renderStakeholders();
+        showToast(members[idx].name + " marked as On Leave in Team Members.");
+      }
+    }
     // Add leave to calendar
     if (fromDate && toDate) {
       const start = new Date(fromDate);
@@ -2130,39 +2700,95 @@ function renderMarkdown(text) {
   return html;
 }
 
-const CHAT_SUGGESTIONS = [
-  "Write user stories for EEL subscription management",
-  "Write user stories for GPOS billing flow",
-  "Create acceptance criteria for EEL activation",
-  "Create a BRD outline for",
-  "Draft a formal email to Vijay regarding",
-  "Identify risks in the EEL project",
-  "Top 5 risks in GPOS subscription manager",
-  "Create an RTM template for EEL requirements",
-  "Key differences between BRD and FRD",
-  "Write a change request for",
-  "Create a RACI matrix for the EEL project",
-  "Write test cases for EEL onboarding flow",
-  "Summarize key requirements for",
-  "Create a gap analysis for",
-  "Write an executive summary for EEL project",
-  "Define KPIs for the BA team",
-  "Draft meeting agenda for project review",
-  "Create stakeholder register for GPOS",
-  "Write a project charter for",
-  "Identify dependencies in the EEL implementation",
-  "How do I write a good use case?",
-  "What is the difference between functional and non-functional requirements?",
-  "Explain MoSCoW prioritization",
-  "How should I structure a requirements traceability matrix?",
-];
+// ── User context helpers ───────────────────────────────────────
+function getDisplayName() {
+  return document.getElementById("rp-name")?.value?.trim()
+    || localStorage.getItem("rp_name")
+    || localStorage.getItem("firstName")
+    || "";
+}
+
+function getMyRole() {
+  return document.getElementById("rp-dept")?.value?.trim()
+    || localStorage.getItem("rp_dept")
+    || "";
+}
+
+function buildChatGreeting() {
+  const name    = getDisplayName();
+  const project = localStorage.getItem("projectName") || "";
+  const hi      = name ? `Hi ${name.split(" ")[0]}!` : "Hi!";
+  const proj = project ? ` How can I help you with **${project}**?` : " How can I help you today?";
+  return `${hi}${proj}`;
+}
+
+function getWorkContext() {
+  return {
+    userName:    getDisplayName(),
+    userRole:    getMyRole(),
+    recentWork:  localStorage.getItem("su_prev_done")  || "",
+    currentPlan: localStorage.getItem("su_prev_today") || "",
+  };
+}
+
+function getChatSuggestions() {
+  const project = localStorage.getItem("projectName") || "";
+  const p = project ? project : "the project";
+  return [
+    `Write user stories for ${p}`,
+    `Create acceptance criteria for ${p}`,
+    `Create a BRD outline for ${p}`,
+    `Identify risks in ${p}`,
+    `Create an RTM template for ${p}`,
+    `Write a gap analysis for ${p}`,
+    `Draft a formal email regarding ${p}`,
+    "Key differences between BRD and FRD",
+    "Write a change request for",
+    "Create a RACI matrix for",
+    "Write test cases for",
+    "Summarize key requirements for",
+    "Write an executive summary for",
+    "Define KPIs for the team",
+    "Draft meeting agenda for project review",
+    "Create stakeholder register for",
+    "Write a project charter for",
+    "How do I write a good use case?",
+    "What is the difference between functional and non-functional requirements?",
+    "Explain MoSCoW prioritization",
+    "How should I structure a requirements traceability matrix?",
+  ];
+}
+
+function appendFollowupChips(msgEl, lastMsg) {
+  const project = localStorage.getItem("projectName") || "";
+  const msg = lastMsg.toLowerCase();
+  let chips = [];
+  if (/brd|requirement|user stor/i.test(msg))
+    chips = ["Create acceptance criteria", "Write an RTM", "Identify risks", "Add non-functional requirements"];
+  else if (/risk|issue|blocker/i.test(msg))
+    chips = ["Create a mitigation plan", "Write a risk register", "Prioritize these risks", "Draft a status update"];
+  else if (/email|letter|draft/i.test(msg))
+    chips = ["Make it more formal", "Make it shorter", "Add a follow-up reminder", "Translate to Hindi"];
+  else if (/test|qa|bug/i.test(msg))
+    chips = ["Write automation test cases", "Create a test plan", "Prioritize test scenarios", "Write a bug report"];
+  else
+    chips = [`Write user stories for ${project || "the project"}`, "Summarize this", "Create a checklist", "Draft an email about this"];
+
+  if (!chips.length) return;
+  const chipRow = document.createElement("div");
+  chipRow.className = "chat-followups";
+  chipRow.innerHTML = chips.map(c =>
+    `<button class="chat-followup-chip" onclick="document.getElementById('chat-input').value=${JSON.stringify(c)};sendChatMessage()">${escHtml(c)}</button>`
+  ).join("");
+  msgEl.appendChild(chipRow);
+}
 
 window.chatAutocomplete = function (val) {
   const box = document.getElementById("chat-suggestions");
   if (!box) return;
   const q = val.trim().toLowerCase();
   if (q.length < 2) { box.style.display = "none"; return; }
-  const matches = CHAT_SUGGESTIONS.filter((s) => s.toLowerCase().includes(q)).slice(0, 6);
+  const matches = getChatSuggestions().filter((s) => s.toLowerCase().includes(q)).slice(0, 6);
   if (!matches.length) { box.style.display = "none"; return; }
   box.style.display = "block";
   box.innerHTML = matches.map((s) =>
@@ -2193,7 +2819,7 @@ window.sendChatMessage = async function () {
   thinking.innerHTML = `<div class="msg-lbl">Assistant</div><span class="ldot" style="background:var(--muted)"></span> Thinking…`;
   msgs.appendChild(thinking);
   msgs.scrollTop = msgs.scrollHeight;
-  const data = await api.chat(msg);
+  const data = await api.chat(msg, null, null, getWorkContext());
   if (data.error) {
     thinking.innerHTML =
       `<div class="msg-lbl" style="color:var(--red)">Error</div>` +
@@ -2203,6 +2829,7 @@ window.sendChatMessage = async function () {
       `<button class="sm" style="font-size:11px;margin-left:4px" onclick="setAIProvider('anthropic')">🧠 Claude</button></div>`;
   } else {
     thinking.innerHTML = `<div class="msg-lbl">Assistant</div>${renderMarkdown(data.text || "No response")}`;
+    appendFollowupChips(thinking, msg);
   }
   msgs.scrollTop = msgs.scrollHeight;
 };
@@ -2217,7 +2844,7 @@ window.quickChat = function (msg) {
 
 window.clearChat = function () {
   const msgs = document.getElementById("chat-messages");
-  if (msgs) msgs.innerHTML = '<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Chat cleared. How can I help?</div>';
+  if (msgs) msgs.innerHTML = `<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>${escHtml(buildChatGreeting())}</div>`;
 };
 
 window.setAIProvider = function (provider) {
@@ -2240,13 +2867,56 @@ window.updateProjectName = function (val) {
 window.submitProjectSetup = function () {
   const val      = document.getElementById("ov-project")?.value?.trim() || "";
   const provider = document.getElementById("ov-ai-platform")?.value || "groq";
+  const errEl    = document.getElementById("ov-project-err");
+
+  if (!val) {
+    if (errEl) { errEl.textContent = "Project name is required."; errEl.style.display = "block"; }
+    const inp = document.getElementById("ov-project");
+    if (inp) { inp.style.border = "1.5px solid var(--red)"; inp.focus(); }
+    return;
+  }
+  if (errEl) errEl.style.display = "none";
+  const inp = document.getElementById("ov-project");
+  if (inp) inp.style.border = "";
+
   window.updateProjectName(val);
   window.setAIProvider(provider);
-  if (val) showToast(`Project set: ${val}`);
+  applyNavLock();
+  // Update chat greeting with new project name
+  const msgs = document.getElementById("chat-messages");
+  if (msgs && msgs.children.length <= 1) {
+    msgs.innerHTML = `<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>${escHtml(buildChatGreeting())}</div>`;
+  }
+  showOvMain();
+  showToast(`Project "${val}" saved — AI: ${provider}`);
 };
 
 // set today as default for the calendar Add Event date field
 (function() { const el = document.getElementById("ev-date"); if (el && !el.value) el.value = new Date().toISOString().slice(0, 10); })();
+
+// ── Populate Weekly Report reporter fields from login ──────────
+(function initReportFields() {
+  const nameEl = document.getElementById("rp-name");
+  const deptEl = document.getElementById("rp-dept");
+  if (nameEl) {
+    // Prefer saved full name, fall back to firstName from EWS login
+    const savedName = localStorage.getItem("rp_name") || "";
+    const firstName = localStorage.getItem("firstName") || "";
+    const ewsUser   = localStorage.getItem("ewsUsername") || "";
+    // Build display name from EWS username if no saved name: "domain\mahesh.beesu" → "Mahesh Beesu"
+    let derivedName = "";
+    if (ewsUser) {
+      const u = ewsUser.includes("\\") ? ewsUser.split("\\")[1] : ewsUser;
+      derivedName = u.split(/[.\-_]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
+    }
+    nameEl.value = savedName || derivedName || firstName;
+    nameEl.addEventListener("change", () => localStorage.setItem("rp_name", nameEl.value));
+  }
+  if (deptEl) {
+    deptEl.value = localStorage.getItem("rp_dept") || "";
+    deptEl.addEventListener("change", () => localStorage.setItem("rp_dept", deptEl.value));
+  }
+})();
 
 // ── Restore project name + AI provider on load ─────────────────
 (function initProjectSetup() {
@@ -2256,7 +2926,7 @@ window.submitProjectSetup = function () {
   const aiSel    = document.getElementById("ov-ai-platform");
   if (projInp) projInp.value = project;
   if (aiSel)   aiSel.value   = provider;
-  if (project) window.updateProjectName(project);
+  if (project) { window.updateProjectName(project); showOvMain(); }
 })();
 
 // ── Copy / share helpers (used inline from HTML) ───────────────
@@ -2286,6 +2956,15 @@ function handleOAuthReturn() {
 
 // ── Init ───────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
+  // Nav lock
+  applyNavLock();
+
+  // Chat greeting
+  const chatMsgs = document.getElementById("chat-messages");
+  if (chatMsgs && chatMsgs.children.length <= 1) {
+    chatMsgs.innerHTML = `<div class="chat-msg ai"><div class="msg-lbl">Assistant</div>${escHtml(buildChatGreeting())}</div>`;
+  }
+
   // Calendar
   renderCalendar(events);
   renderSchedule(todayKey(), events);
@@ -2341,6 +3020,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ewsCreds = ewsGetCreds();
   const { ewsUrl, username, password } = ewsCreds;
   ewsRestoreUI();
+  window.updateWelcomeMessage();
   if (ewsUrl && username && password) {
     // Already connected — remove login-mode, show sidebar, go to Dashboard
     document.getElementById("app")?.classList.remove("login-mode");

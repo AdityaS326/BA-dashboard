@@ -9,7 +9,9 @@ function msToken() {
   return localStorage.getItem("spToken") || "";
 }
 
-function isExpiredTokenError(status, msg) {
+function isMsTokenError(endpoint, status, msg) {
+  // Only fire ms-token-expired for Graph API calls, NOT for EWS (EWS uses NTLM, not OAuth)
+  if (endpoint.startsWith("/api/ews")) return false;
   return status === 401 || /expired|InvalidAuthenticationToken|token.*invalid/i.test(msg || "");
 }
 
@@ -21,7 +23,7 @@ async function get(endpoint, params = {}) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
       const msg = err.error || `Request failed (${res.status})`;
-      if (isExpiredTokenError(res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
+      if (isMsTokenError(endpoint, res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
       return { error: msg };
     }
     return res.json();
@@ -40,7 +42,7 @@ async function post(endpoint, body) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
       const msg = err.error || `Request failed (${res.status})`;
-      if (isExpiredTokenError(res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
+      if (isMsTokenError(endpoint, res.status, msg)) window.dispatchEvent(new CustomEvent("ms-token-expired"));
       return { error: msg };
     }
     return res.json();
@@ -51,7 +53,16 @@ async function post(endpoint, body) {
 
 export const api = {
   // General assistant chat — pass provider so backend routes to correct AI
-  chat: (prompt, system, provider) => post("/api/claude", { prompt, system, provider: provider || localStorage.getItem("ai_provider") || "groq" }),
+  chat: (prompt, system, provider, ctx = {}) => post("/api/claude", {
+    prompt,
+    system,
+    projectName: localStorage.getItem("projectName") || "",
+    provider: provider || localStorage.getItem("ai_provider") || "groq",
+    userName:    ctx.userName    || "",
+    userRole:    ctx.userRole    || "",
+    recentWork:  ctx.recentWork  || "",
+    currentPlan: ctx.currentPlan || "",
+  }),
 
   // Weekly report generation
   generateReport: (data) => post("/api/report", { ...data, provider: data.provider || localStorage.getItem("ai_provider") || "groq" }),
@@ -77,12 +88,20 @@ export const api = {
   teamsChatMessages: (chatId)   => get(`/api/teams/chats/${chatId}/messages`, { token: msToken() }),
 
   // Microsoft 365 — Outlook
-  outlookEmails: ()      => get("/api/outlook/emails", { token: msToken() }),
-  outlookDraft:  (data)  => post("/api/outlook/draft", data),
-  outlookSend:   (data)  => post("/api/outlook/send",  { ...data, token: msToken() }),
+  outlookEmails:    ()    => get("/api/outlook/emails",           { token: msToken() }),
+  outlookEmailBody: (id)  => get(`/api/outlook/emails/${id}/body`, { token: msToken() }),
+  outlookDraft:     (data) => post("/api/outlook/draft", data),
+  outlookSend:      (data) => post("/api/outlook/send", { ...data, token: msToken() }),
 
   // Microsoft 365 — Calendar
   msCalendar: () => get("/api/mscalendar/events", { token: msToken() }),
+
+  // SharePoint — list user's recent documents (OneDrive)
+  spFiles:     ()         => get("/api/sharepoint/files",      { token: msToken() }),
+  // SharePoint — list sites the user has access to
+  spSites:     ()         => get("/api/sharepoint/sites",      { token: msToken() }),
+  // SharePoint — list document library files from a specific site
+  spSiteFiles: (siteId)   => get("/api/sharepoint/site-files", { token: msToken(), siteId }),
 
   // Exchange Web Services (on-premise Exchange)
   ewsMeetings:     (creds) => post("/api/ews/meetings",        creds),
@@ -91,6 +110,9 @@ export const api = {
   ewsSendEmail:    (data)  => post("/api/ews/send-email",       data),
   ewsCreateMeeting:(data)  => post("/api/ews/create-meeting",   data),
   ewsDiscover:     (email) => get("/api/ews/discover",          { email }),
+
+  teamMembers:     ()        => get("/api/team-members"),
+  saveTeamMembers: (members) => post("/api/team-members", { members }),
 
   // Document upload to SharePoint
   uploadDoc: (formData) => {

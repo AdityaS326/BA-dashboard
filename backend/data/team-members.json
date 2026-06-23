@@ -1,0 +1,41 @@
+[
+  {
+    "name": "Aadhi",
+    "role": "BA",
+    "status": "on-leave",
+    "leaves": [
+      {
+        "from": "2026-06-18",
+        "to": "2026-06-18",
+        "type": "Sick leave"
+      }
+    ]
+  },
+  {
+    "name": "Mahesh",
+    "role": "DEv",
+    "status": "on-leave",
+    "leaves": [
+      {
+        "from": "2026-06-19",
+        "to": "2026-06-19",
+        "type": "Planned leave"
+      },
+      {
+        "from": "2026-06-18",
+        "to": "2026-06-18",
+        "type": "Planned leave"
+      }
+    ]
+  },
+  {
+    "name": "Prasanna",
+    "role": "DEV",
+    "status": "available"
+  },
+  {
+    "name": "Vijay",
+    "role": "Manager",
+    "status": "available"
+  }
+]

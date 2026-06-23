@@ -30,9 +30,8 @@ function showDocMenu(e, idx) {
   menu.style.cssText = "position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 4px 16px rgba(0,0,0,.18);min-width:150px;overflow:hidden";
 
   [
-    { icon: "ti-edit",         label: "Edit name",   fn: () => editDoc(idx) },
-    { icon: "ti-cloud-upload", label: "Upload file", fn: () => triggerDocUpload(idx) },
-    { icon: "ti-trash",        label: "Delete",      fn: () => deleteDoc(idx), red: true },
+    { icon: "ti-edit",  label: "Edit name", fn: () => editDoc(idx) },
+    { icon: "ti-trash", label: "Delete",    fn: () => deleteDoc(idx), red: true },
   ].forEach(({ icon, label, fn, red }) => {
     const btn = document.createElement("button");
     btn.style.cssText = `display:flex;align-items:center;gap:9px;width:100%;padding:9px 14px;background:none;border:none;cursor:pointer;font-size:13px;color:${red ? "var(--red)" : "var(--text)"};text-align:left`;
