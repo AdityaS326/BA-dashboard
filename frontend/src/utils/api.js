@@ -2,8 +2,8 @@
 // Central API client — all HTTP calls to the backend go through here.
 
 const BASE = window.location.hostname === "localhost"
-  ? "http://localhost:3000"   // Dev: backend runs separately
-  : "";                        // Prod: same origin (backend serves frontend)
+  ? "http://localhost:3000"                                      // Dev
+  : "https://ba-dashboard-67s1.onrender.com";
 
 function msToken() {
   return localStorage.getItem("spToken") || "";
