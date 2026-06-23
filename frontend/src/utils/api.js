@@ -98,4 +98,11 @@ export const api = {
       .then((r) => r.json())
       .catch((e) => ({ error: e.message }));
   },
+
+  // Transcribe audio/video via OpenAI Whisper
+  transcribeAudio: (formData) => {
+    return fetch(`${BASE}/api/transcribe`, { method: "POST", body: formData })
+      .then((r) => r.json())
+      .catch((e) => ({ error: e.message }));
+  },
 };
