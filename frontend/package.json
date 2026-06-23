@@ -1,0 +1,14 @@
+{
+  "name": "ba-hub-frontend",
+  "version": "3.0.0",
+  "description": "BA Productivity Hub – Frontend",
+  "scripts": {
+    "dev":     "npx live-server --port=5173 --open=index.html --no-browser",
+    "start":   "npx serve . -p 5173",
+    "preview": "npx serve . -p 4173"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2",
+    "serve":       "^14.2.1"
+  }
+}
