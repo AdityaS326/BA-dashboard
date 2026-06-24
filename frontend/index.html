@@ -35,6 +35,8 @@
     <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Integrations</span></div>
     <div class="nav-item" data-panel="tc" onclick="nav(this)"><i class="ti ti-brand-teams"></i><span class="nav-lbl">Teams Chat</span></div>
     <div class="nav-item" data-panel="ol" onclick="nav(this)"><i class="ti ti-mail"></i><span class="nav-lbl">Outlook inbox</span><span class="nav-badge" id="ol-badge" style="display:none">0</span></div>
+    <div class="nav-item" data-panel="gm" onclick="nav(this)"><i class="ti ti-brand-gmail" style="color:#EA4335"></i><span class="nav-lbl">Gmail</span></div>
+    <div class="nav-item" data-panel="wa" onclick="nav(this)"><i class="ti ti-brand-whatsapp" style="color:#25D366"></i><span class="nav-lbl">WhatsApp</span></div>
     <div class="nav-item" data-panel="wr" onclick="nav(this)"><i class="ti ti-report"></i><span class="nav-lbl">Weekly report</span></div>
   </div>
   <div class="sb-section">
@@ -664,9 +666,7 @@
     <!-- Inline M365 connect notice (shown when no token) -->
     <div id="dc-connect-hint" style="display:none;background:rgba(0,120,212,.07);border:1px solid rgba(0,120,212,.22);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--muted)">
       <i class="ti ti-info-circle" style="color:#0078d4;margin-right:5px"></i>
-      Microsoft 365 not connected —
-      <a href="/api/auth/microsoft" style="color:#0078d4;font-weight:600;text-decoration:none">Connect now</a>
-      to upload directly to SharePoint.
+      Microsoft 365 not connected — files will be saved locally. Paste your token above to also sync to SharePoint.
     </div>
 
     <!-- Upload row -->
@@ -840,6 +840,143 @@
           <div id="chat-suggestions" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;overflow:hidden"></div>
         </div>
         <button class="primary" onclick="sendChatMessage()" aria-label="Send"><i class="ti ti-send"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ GMAIL ███████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-gm">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:14px;padding:18px 20px;background:linear-gradient(135deg,#EA4335 0%,#FBBC05 50%,#34A853 100%);border-radius:var(--r);margin-bottom:14px">
+    <div style="width:48px;height:48px;background:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);flex-shrink:0">
+      <i class="ti ti-brand-gmail" style="font-size:28px;color:#EA4335"></i>
+    </div>
+    <div>
+      <div style="font-size:18px;font-weight:700;color:#fff">Gmail</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.85)">Google Mail — open in a new tab</div>
+    </div>
+    <a href="https://mail.google.com" target="_blank" rel="noopener" style="margin-left:auto;text-decoration:none">
+      <button style="background:#fff;color:#EA4335;border:none;border-radius:var(--r-sm);padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <i class="ti ti-external-link" style="font-size:13px"></i> Open Gmail
+      </button>
+    </a>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-bolt" style="color:#EA4335"></i> Quick access</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding-top:4px">
+      <a href="https://mail.google.com/#inbox" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-inbox" style="font-size:18px;color:#EA4335"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Inbox</div><div style="font-size:11px;color:var(--muted)">View all emails</div></div>
+        </div>
+      </a>
+      <a href="https://mail.google.com/#compose" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-pencil" style="font-size:18px;color:#FBBC05"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Compose</div><div style="font-size:11px;color:var(--muted)">Write new email</div></div>
+        </div>
+      </a>
+      <a href="https://mail.google.com/#sent" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-send" style="font-size:18px;color:#34A853"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Sent</div><div style="font-size:11px;color:var(--muted)">Sent emails</div></div>
+        </div>
+      </a>
+      <a href="https://mail.google.com/#drafts" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-file-text" style="font-size:18px;color:#4285F4"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Drafts</div><div style="font-size:11px;color:var(--muted)">Saved drafts</div></div>
+        </div>
+      </a>
+      <a href="https://mail.google.com/#starred" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-star" style="font-size:18px;color:#FBBC05"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Starred</div><div style="font-size:11px;color:var(--muted)">Important emails</div></div>
+        </div>
+      </a>
+      <a href="https://calendar.google.com" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-calendar" style="font-size:18px;color:#4285F4"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Google Calendar</div><div style="font-size:11px;color:var(--muted)">View schedule</div></div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Info note -->
+  <div style="padding:10px 14px;background:rgba(66,133,244,.07);border:1px solid rgba(66,133,244,.2);border-radius:var(--r-sm);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px">
+    <i class="ti ti-info-circle" style="color:#4285F4;font-size:14px;flex-shrink:0"></i>
+    Gmail opens in a new browser tab for security. Google blocks embedding in external apps.
+  </div>
+</div>
+
+<!-- ██ WHATSAPP ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-wa">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:14px;padding:18px 20px;background:linear-gradient(135deg,#128C7E 0%,#25D366 100%);border-radius:var(--r);margin-bottom:14px">
+    <div style="width:48px;height:48px;background:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);flex-shrink:0">
+      <i class="ti ti-brand-whatsapp" style="font-size:28px;color:#25D366"></i>
+    </div>
+    <div>
+      <div style="font-size:18px;font-weight:700;color:#fff">WhatsApp</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.85)">WhatsApp Web — scan QR to connect</div>
+    </div>
+    <a href="https://web.whatsapp.com" target="_blank" rel="noopener" style="margin-left:auto;text-decoration:none">
+      <button style="background:#fff;color:#128C7E;border:none;border-radius:var(--r-sm);padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <i class="ti ti-external-link" style="font-size:13px"></i> Open WhatsApp Web
+      </button>
+    </a>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-bolt" style="color:#25D366"></i> Quick access</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding-top:4px">
+      <a href="https://web.whatsapp.com" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-brand-whatsapp" style="font-size:18px;color:#25D366"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Chats</div><div style="font-size:11px;color:var(--muted)">All conversations</div></div>
+        </div>
+      </a>
+      <a href="https://web.whatsapp.com/#new-chat" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-message-plus" style="font-size:18px;color:#128C7E"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">New chat</div><div style="font-size:11px;color:var(--muted)">Start conversation</div></div>
+        </div>
+      </a>
+      <a href="https://web.whatsapp.com/#status" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-circle-dot" style="font-size:18px;color:#34B7F1"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Status</div><div style="font-size:11px;color:var(--muted)">View updates</div></div>
+        </div>
+      </a>
+      <a href="https://web.whatsapp.com/#calls" target="_blank" rel="noopener" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s" onmouseenter="this.style.background='var(--surface3,#e8eaed)'" onmouseleave="this.style.background='var(--surface2)'">
+          <i class="ti ti-phone" style="font-size:18px;color:#25D366"></i>
+          <div><div style="font-size:13px;font-weight:500;color:var(--text)">Calls</div><div style="font-size:11px;color:var(--muted)">Recent calls</div></div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- How to connect card -->
+  <div class="card">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-device-mobile" style="color:#25D366"></i> How to connect</span></div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:24px;height:24px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;color:#fff;margin-top:1px">1</div>
+        <div style="font-size:13px;color:var(--text)">Click <strong>Open WhatsApp Web</strong> above — it will open in a new tab.</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:24px;height:24px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;color:#fff;margin-top:1px">2</div>
+        <div style="font-size:13px;color:var(--text)">Open <strong>WhatsApp</strong> on your phone → tap the <strong>⋮ menu</strong> → <strong>Linked devices</strong>.</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:24px;height:24px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;color:#fff;margin-top:1px">3</div>
+        <div style="font-size:13px;color:var(--text)">Tap <strong>Link a device</strong> and scan the QR code shown on the WhatsApp Web page.</div>
       </div>
     </div>
   </div>

@@ -279,6 +279,7 @@ const PAGE_TITLES = {
   tm: "Teams meetings",
   ov: "Dashboard",        cal: "Calendar & meetings",
   tc: "Teams Chat",       ol:  "Outlook inbox",
+  gm: "Gmail",            wa:  "WhatsApp",
   wr: "Weekly report",    mm:  "MOM generator",
   su: "Stand-up generator", dc: "Document repository",
   lv: "Leave & resources",  ai: "General assistant",
@@ -290,14 +291,14 @@ function isProjectConfigured() {
 function applyNavLock() {
   const ok = isProjectConfigured();
   document.querySelectorAll(".nav-item[data-panel]").forEach(el => {
-    if (el.dataset.panel === "ov") return;
+    if (["ov", "gm", "wa"].includes(el.dataset.panel)) return;
     el.classList.toggle("nav-locked", !ok);
   });
 }
 
 window.nav = function (el) {
   const id = el.dataset.panel;
-  if (id !== "ov" && !isProjectConfigured()) return;
+  if (id !== "ov" && id !== "gm" && id !== "wa" && !isProjectConfigured()) return;
   document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
   const panel   = document.getElementById("p-" + id);
@@ -458,24 +459,34 @@ window.uploadDocFromForm = async function (btn) {
   if (!file) { showToast("Choose a file first."); return; }
 
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="font-size:12px;animation:spin .7s linear infinite"></i>'; }
-  if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = "Uploading…"; }
-
-  localStorage.setItem("spDocFolder", path);
 
   const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   const name  = file.name.replace(/\.[^.]+$/, "");
-  DOCS.unshift({ n: name, v: "v1.0", s: "Pending", d: today, desc: "Uploaded from local file.", url: "" });
-  filterDocs();
-
   const token = localStorage.getItem("spToken") || "";
+
+  // No SharePoint token — save locally and show success
   if (!token) {
+    DOCS.unshift({ n: name, v: "v1.0", s: "Draft", d: today, desc: "Saved locally (not yet on SharePoint).", url: "" });
+    try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
+    filterDocs();
+
+    fileInput.value = "";
+    const lbl = document.getElementById("dc-file-name");
+    if (lbl) lbl.textContent = "Choose file (.pdf / .docx)";
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-upload"></i> Upload'; }
     if (statusEl) {
       statusEl.style.display = "block";
-      statusEl.innerHTML = `<i class="ti ti-alert-circle" style="color:var(--orange);margin-right:4px"></i>Microsoft 365 not connected — <a href="/api/auth/microsoft" style="color:#0078d4;font-weight:600;text-decoration:none">Connect now</a> to upload to SharePoint.`;
+      statusEl.innerHTML = `<i class="ti ti-check" style="color:var(--green);margin-right:4px"></i>` +
+        `<strong>${file.name}</strong> added to your documents. ` +
+        `<span style="color:var(--muted)">Connect Microsoft 365 above to also sync it to SharePoint.</span>`;
     }
+    showToast(`${file.name} added to documents.`);
     return;
   }
+
+  // SharePoint token present — upload to SharePoint
+  if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = "Uploading to SharePoint…"; }
+  localStorage.setItem("spDocFolder", path);
 
   const fd = new FormData();
   fd.append("file",       file);
@@ -486,17 +497,15 @@ window.uploadDocFromForm = async function (btn) {
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-upload"></i> Upload'; }
 
   if (data.error) {
-    if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = "Upload failed: " + data.error; }
+    if (statusEl) { statusEl.style.display = "block"; statusEl.textContent = "SharePoint upload failed: " + data.error; }
     showToast("Upload failed: " + data.error, 4000);
     return;
   }
 
-  DOCS[0].url = data.url || "";
-  DOCS[0].s   = "Approved";
+  DOCS.unshift({ n: name, v: "v1.0", s: "Approved", d: today, desc: "Uploaded from local file.", url: data.url || "" });
   try { localStorage.setItem("ba_docs", JSON.stringify(DOCS)); } catch {}
   filterDocs();
 
-  // Reset form
   fileInput.value = "";
   const lbl = document.getElementById("dc-file-name");
   if (lbl) lbl.textContent = "Choose file (.pdf / .docx)";
