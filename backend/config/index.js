@@ -23,6 +23,12 @@ export const config = {
     clientId:     process.env.SP_CLIENT_ID     || "",
     clientSecret: process.env.SP_CLIENT_SECRET || "",
   },
+
+  gmail: {
+    clientId:     process.env.GMAIL_CLIENT_ID     || "",
+    clientSecret: process.env.GMAIL_CLIENT_SECRET || "",
+    redirectUri:  process.env.GMAIL_REDIRECT_URI  || "http://localhost:3000/api/gmail/callback",
+  },
 };
 
 export function requireEnv(key) {

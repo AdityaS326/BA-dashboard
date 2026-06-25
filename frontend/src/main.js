@@ -7,6 +7,8 @@ import { seedEvents, todayKey } from "./utils/calendar.js";
 import { renderOvMeetings, renderOvUpcoming, updateOverviewStats, initDocChart, updateDocChart, initHealthChart, filterHealthChart } from "./pages/overview.js";
 import { renderCalendar, renderSchedule, calNav as _calNav, addEvent as _addEvent, checkAndShowReminder } from "./pages/calendar.js";
 import { DOCS, renderDocs, filterDocs, addNewDoc } from "./pages/documents.js";
+import { gmailInit } from "./pages/gmail.js";
+import { waInit }    from "./pages/whatsapp.js";
 
 // ── State ──────────────────────────────────────────────────────
 let events = seedEvents();
@@ -340,6 +342,9 @@ window.nav = function (el) {
   if (id === "dc") {
     window.syncSharePointDocs(document.getElementById("sp-sync-btn"));
   }
+
+  if (id === "gm") gmailInit();
+  if (id === "wa") waInit();
 };
 
 // ── Clock ──────────────────────────────────────────────────────
@@ -3046,5 +3051,17 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     // Not connected — start the AI background animation
     startTmBackground();
+  }
+
+  // Handle Google OAuth return: /?panel=gm redirects back after consent
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _returnPanel = _urlParams.get('panel');
+  if (_returnPanel) {
+    window.history.replaceState({}, '', '/');
+    const _navEl = document.querySelector(`[data-panel="${_returnPanel}"]`);
+    if (_navEl) {
+      // Small delay so the rest of DOMContentLoaded finishes first
+      setTimeout(() => nav(_navEl), 120);
+    }
   }
 });
