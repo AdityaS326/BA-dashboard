@@ -1,143 +1,172 @@
 // backend/controllers/whatsappController.js
-// Requires: npm install whatsapp-web.js qrcode
-// (whatsapp-web.js pulls Puppeteer + ~150 MB Chromium on first install)
+// Meta WhatsApp Business Cloud API
+// Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
 
-let Client, LocalAuth, qrcode;
-let libLoaded = false;
+import { getCredential } from './credentialsController.js';
 
-async function loadLibs() {
-  if (libLoaded) return true;
+const GRAPH = 'https://graph.facebook.com/v19.0';
+
+function getCreds() {
+  return {
+    phoneNumberId:     getCredential('WA_PHONE_NUMBER_ID'),
+    accessToken:       getCredential('WA_ACCESS_TOKEN'),
+    webhookVerifyToken: getCredential('WA_WEBHOOK_VERIFY_TOKEN') || 'ba_dashboard_verify',
+  };
+}
+
+// In-memory message store  (keyed by contact phone number)
+// { "919876543210": [ { id, from, to, body, timestamp, direction } ] }
+const _messages = {};
+let   _profile  = null;   // { name, phone }
+
+// ── GET /api/whatsapp/status ──────────────────────────────────────────────────
+export async function getStatus(req, res) {
+  const { phoneNumberId, accessToken } = getCreds();
+  if (!phoneNumberId || !accessToken) {
+    return res.json({ connected: false, reason: 'not_configured' });
+  }
   try {
-    const ww = await import('whatsapp-web.js');
-    Client    = ww.Client;
-    LocalAuth = ww.LocalAuth;
-    const qr  = await import('qrcode');
-    qrcode    = qr.default;
-    libLoaded = true;
-    return true;
-  } catch {
-    return false;
+    const r = await fetch(
+      `${GRAPH}/${phoneNumberId}?fields=display_phone_number,verified_name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const d = await r.json();
+    if (d.error) return res.json({ connected: false, reason: d.error.message });
+    _profile = { name: d.verified_name || d.display_phone_number, phone: d.display_phone_number };
+    res.json({ connected: true, profile: _profile });
+  } catch (err) {
+    res.json({ connected: false, reason: err.message });
   }
 }
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let waClient   = null;
-let waStatus   = 'disconnected'; // disconnected | initializing | qr | connecting | ready
-let currentQR  = null;
-let chatsCache = [];
-let profile    = null;
+// ── POST /api/whatsapp/send ───────────────────────────────────────────────────
+export async function sendMessage(req, res) {
+  const { phoneNumberId, accessToken } = getCreds();
+  if (!phoneNumberId || !accessToken) {
+    return res.status(503).json({ error: 'WhatsApp credentials not configured.' });
+  }
+  const { to, message } = req.body || {};
+  if (!to || !message) return res.status(400).json({ error: '"to" and "message" are required.' });
 
-function resetState() {
-  waClient   = null;
-  waStatus   = 'disconnected';
-  currentQR  = null;
-  chatsCache = [];
-  profile    = null;
-}
-
-// ── Controllers ───────────────────────────────────────────────────────────────
-
-export async function initWhatsApp(req, res) {
-  if (waStatus === 'ready')  return res.json({ status: 'ready' });
-  if (waStatus !== 'disconnected') return res.json({ status: waStatus });
-
-  const ok = await loadLibs();
-  if (!ok) {
-    return res.status(503).json({
-      error: 'whatsapp-web.js is not installed. Run: npm install whatsapp-web.js',
+  const toClean = to.replace(/\D/g, '');
+  try {
+    const r = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization:  `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to:   toClean,
+        type: 'text',
+        text: { body: message },
+      }),
     });
-  }
+    const d = await r.json();
+    if (d.error) return res.status(400).json({ error: d.error.message });
 
-  waStatus = 'initializing';
+    // Store sent message locally
+    if (!_messages[toClean]) _messages[toClean] = [];
+    _messages[toClean].push({
+      id:        d.messages?.[0]?.id || Date.now().toString(),
+      from:      'me',
+      to:        toClean,
+      body:      message,
+      timestamp: Math.floor(Date.now() / 1000),
+      direction: 'outbound',
+    });
 
-  waClient = new Client({
-    authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-    puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-    },
-  });
-
-  waClient.on('qr', async (qr) => {
-    waStatus  = 'qr';
-    currentQR = await qrcode.toDataURL(qr);
-  });
-
-  waClient.on('authenticated', () => {
-    waStatus  = 'connecting';
-    currentQR = null;
-  });
-
-  waClient.on('ready', async () => {
-    waStatus = 'ready';
-    try {
-      const info = waClient.info;
-      profile = { name: info.pushname, phone: info.wid.user };
-      await refreshChatsInternal();
-    } catch (e) {
-      console.error('[WhatsApp] ready error:', e.message);
-    }
-  });
-
-  waClient.on('disconnected', () => resetState());
-  waClient.on('auth_failure', () => resetState());
-
-  waClient.initialize().catch(err => {
-    console.error('[WhatsApp] init error:', err.message);
-    resetState();
-  });
-
-  res.json({ status: 'initializing' });
-}
-
-export function getStatus(req, res) {
-  const resp = { status: waStatus };
-  if (waStatus === 'qr' && currentQR)    resp.qr      = currentQR;
-  if (waStatus === 'ready' && profile)   resp.profile = profile;
-  res.json(resp);
-}
-
-export function getChats(req, res) {
-  if (waStatus !== 'ready') return res.status(401).json({ error: 'Not connected' });
-  res.json({ chats: chatsCache, profile });
-}
-
-export async function refreshChats(req, res) {
-  if (waStatus !== 'ready') return res.status(401).json({ error: 'Not connected' });
-  try {
-    await refreshChatsInternal();
-    res.json({ chats: chatsCache });
+    res.json({ success: true, messageId: d.messages?.[0]?.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-export async function logoutWhatsApp(req, res) {
-  try {
-    if (waClient) {
-      await waClient.logout().catch(() => {});
-      await waClient.destroy().catch(() => {});
-    }
-  } catch { /* ignore */ }
-  resetState();
-  res.json({ success: true });
+// ── GET /api/whatsapp/conversations ──────────────────────────────────────────
+export function getConversations(req, res) {
+  const contacts = Object.entries(_messages).map(([phone, msgs]) => {
+    const last = msgs[msgs.length - 1];
+    const unread = msgs.filter(m => m.direction === 'inbound' && !m.read).length;
+    return { phone, name: last.fromName || ('+' + phone), lastMessage: last, unread };
+  });
+  contacts.sort((a,b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
+  res.json({ conversations: contacts, profile: _profile });
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// ── GET /api/whatsapp/messages/:phone ─────────────────────────────────────────
+export function getMessages(req, res) {
+  const phone = req.params.phone.replace(/\D/g,'');
+  const msgs  = _messages[phone] || [];
+  // Mark as read
+  msgs.forEach(m => { if (m.direction === 'inbound') m.read = true; });
+  res.json({ messages: msgs });
+}
 
-async function refreshChatsInternal() {
-  const all = await waClient.getChats();
-  chatsCache = all.slice(0, 40).map(c => ({
-    id:          c.id._serialized,
-    name:        c.name || c.id.user,
-    isGroup:     c.isGroup,
-    unreadCount: c.unreadCount || 0,
-    lastMessage: c.lastMessage
-      ? {
-          body:      (c.lastMessage.body || '').substring(0, 120),
-          timestamp: c.lastMessage.timestamp,
-          fromMe:    c.lastMessage.fromMe,
+// ── GET /api/whatsapp/webhook  (Meta verification challenge) ──────────────────
+export function webhookVerify(req, res) {
+  const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
+  const { webhookVerifyToken } = getCreds();
+  if (mode === 'subscribe' && token === webhookVerifyToken) {
+    console.log('[WhatsApp] Webhook verified');
+    return res.status(200).send(challenge);
+  }
+  res.status(403).json({ error: 'Verification failed' });
+}
+
+// ── POST /api/whatsapp/webhook  (incoming messages from Meta) ─────────────────
+export function webhookReceive(req, res) {
+  res.sendStatus(200); // Always acknowledge immediately
+
+  try {
+    const body = req.body;
+    if (body.object !== 'whatsapp_business_account') return;
+
+    for (const entry of body.entry || []) {
+      for (const change of entry.changes || []) {
+        const val = change.value;
+        if (!val) continue;
+
+        // Incoming messages
+        for (const msg of val.messages || []) {
+          const from    = msg.from;
+          const text    = msg.text?.body || msg.type;
+          const name    = val.contacts?.find(c => c.wa_id === from)?.profile?.name || ('+' + from);
+
+          if (!_messages[from]) _messages[from] = [];
+          // Avoid duplicates
+          if (!_messages[from].find(m => m.id === msg.id)) {
+            _messages[from].push({
+              id:        msg.id,
+              from,
+              fromName:  name,
+              body:      text,
+              timestamp: Number(msg.timestamp),
+              direction: 'inbound',
+              read:      false,
+            });
+          }
         }
-      : null,
-  }));
+      }
+    }
+  } catch (err) {
+    console.error('[WhatsApp webhook]', err.message);
+  }
+}
+
+// ── GET /api/whatsapp/profile ─────────────────────────────────────────────────
+export async function getProfile(req, res) {
+  const { phoneNumberId, accessToken } = getCreds();
+  if (!phoneNumberId || !accessToken) return res.status(503).json({ error: 'Not configured' });
+  try {
+    const r = await fetch(
+      `${GRAPH}/${phoneNumberId}?fields=display_phone_number,verified_name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const d = await r.json();
+    if (d.error) return res.status(400).json({ error: d.error.message });
+    res.json({ phone: d.display_phone_number, name: d.verified_name });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }

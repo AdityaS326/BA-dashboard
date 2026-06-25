@@ -25,6 +25,7 @@ import transcribeRouter   from "./routes/transcribe.js";
 import teamMembersRouter  from "./routes/teamMembers.js";
 import gmailRouter        from "./routes/gmail.js";
 import whatsappRouter     from "./routes/whatsapp.js";
+import credentialsRouter  from "./routes/credentials.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -56,6 +57,7 @@ app.use("/api/transcribe",   transcribeRouter);
 app.use("/api/team-members", teamMembersRouter);
 app.use("/api/gmail",        gmailRouter);
 app.use("/api/whatsapp",     whatsappRouter);
+app.use("/api/credentials",  credentialsRouter);
 
 // ── Microsoft OAuth login redirect ─────────────────────────────
 app.get("/api/auth/microsoft", (req, res) => {

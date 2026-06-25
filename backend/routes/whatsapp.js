@@ -1,16 +1,23 @@
 // backend/routes/whatsapp.js
 import { Router } from 'express';
 import {
-  initWhatsApp, getStatus, getChats,
-  refreshChats, logoutWhatsApp,
+  getStatus,
+  sendMessage,
+  getConversations,
+  getMessages,
+  webhookVerify,
+  webhookReceive,
+  getProfile,
 } from '../controllers/whatsappController.js';
 
 const router = Router();
 
-router.post('/init',    initWhatsApp);
-router.get('/status',   getStatus);
-router.get('/chats',    getChats);
-router.post('/refresh', refreshChats);
-router.post('/logout',  logoutWhatsApp);
+router.get('/status',          getStatus);
+router.get('/profile',         getProfile);
+router.get('/conversations',   getConversations);
+router.get('/messages/:phone', getMessages);
+router.post('/send',           sendMessage);
+router.get('/webhook',         webhookVerify);
+router.post('/webhook',        webhookReceive);
 
 export default router;

@@ -74,6 +74,16 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); heig
 #content { flex: 1; overflow-y: auto; padding: 18px 20px 30px; background: var(--bg); }
 .panel { display: none; } .panel.active { display: block; }
 
+/* Full-bleed panels (Gmail, WhatsApp) — fill the entire right area edge-to-edge */
+.panel-full { display: none; }
+.panel-full.active {
+  display: flex;
+  flex-direction: column;
+  margin: -18px -20px -30px;          /* cancel #content padding */
+  height: calc(100vh - 50px);         /* 50px = #topbar height  */
+  overflow: hidden;
+}
+
 /* ─── CARDS ──────────────────────────────────────────────────── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
 .card:last-child { margin-bottom: 0; }
