@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#f8f9fb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Falcon App</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='85'>🦅</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+
+<div id="app" class="login-mode">
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo" style="font-size:17px;line-height:1">🦅</div>
+    <div class="sb-name-wrap">
+      <div class="sb-title">Falcon App</div>
+      <div id="sb-project-name" style="display:none;font-size:10px;font-weight:600;color:var(--blue);margin-top:2px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em"></div>
+    </div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Overview</span></div>
+    <div class="nav-item" data-panel="ov" onclick="nav(this)"><i class="ti ti-home"></i><span class="nav-lbl">Dashboard</span></div>
+    <div class="nav-item" data-panel="cal" onclick="nav(this)"><i class="ti ti-calendar"></i><span class="nav-lbl">Calendar</span><span class="nav-badge" id="cal-badge">3</span></div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Integrations</span></div>
+    <div class="nav-item" data-panel="tc" onclick="nav(this)"><i class="ti ti-brand-teams"></i><span class="nav-lbl">Teams Chat</span></div>
+    <div class="nav-item" data-panel="ol" onclick="nav(this)"><i class="ti ti-mail"></i><span class="nav-lbl">Outlook inbox</span><span class="nav-badge" id="ol-badge" style="display:none">0</span></div>
+    <div class="nav-item" data-panel="gm" onclick="nav(this)"><i class="ti ti-brand-gmail" style="color:#EA4335"></i><span class="nav-lbl">Gmail</span></div>
+    <div class="nav-item" data-panel="wa" onclick="nav(this)"><i class="ti ti-brand-whatsapp" style="color:#25D366"></i><span class="nav-lbl">WhatsApp</span></div>
+    <div class="nav-item" data-panel="wr" onclick="nav(this)"><i class="ti ti-report"></i><span class="nav-lbl">Weekly report</span></div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Tools</span></div>
+    <div class="nav-item" data-panel="mm" onclick="nav(this)"><i class="ti ti-notes"></i><span class="nav-lbl">MOM generator</span></div>
+    <div class="nav-item" data-panel="su" onclick="nav(this)"><i class="ti ti-sun"></i><span class="nav-lbl">Stand-up</span></div>
+    <div class="nav-item" data-panel="dc" onclick="nav(this)"><i class="ti ti-folder"></i><span class="nav-lbl">Documents</span></div>
+    <div class="nav-item" data-panel="lv" onclick="nav(this)"><i class="ti ti-beach"></i><span class="nav-lbl">Leave & resources</span></div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">General</span></div>
+    <div class="nav-item" data-panel="ai" onclick="nav(this)"><i class="ti ti-robot"></i><span class="nav-lbl">Assistant</span></div>
+  </div>
+  <div class="sb-foot">
+    <div><div class="sb-foot-clock" id="clk">--:--:--</div><div class="sb-foot-txt" id="dt-lbl"></div></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar" style="position:relative">
+    <div class="tb-left">
+      <span class="tb-page" id="page-title">Teams meetings</span>
+    </div>
+    <div id="tb-welcome" style="position:absolute;left:50%;transform:translateX(-50%);top:50%;margin-top:-10px;font-size:15px;font-weight:600;color:var(--text);display:none;white-space:nowrap;pointer-events:none"></div>
+    <div class="tb-right">
+      <span class="tb-pill" id="reminder-pill" style="display:none" onclick="nav(document.querySelector('[data-panel=cal]'))">
+        <i class="ti ti-bell" style="font-size:11px"></i> <span id="reminder-txt"></span>
+      </span>
+      <span class="tb-pill live"><i class="ti ti-circle-check" style="font-size:11px"></i> Live</span>
+      <span class="tb-pill" id="topbar-time">--:--</span>
+      <span class="tb-pill" id="topbar-week"></span>
+      <button onclick="ewsDisconnect()" title="Logout"
+        style="display:flex;align-items:center;gap:5px;padding:5px 11px;font-size:12px;font-weight:500;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;transition:all .15s"
+        onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'"
+        onmouseout="this.style.background='transparent';this.style.color='var(--muted)'">
+        <i class="ti ti-logout" style="font-size:13px"></i> Logout
+      </button>
+    </div>
+  </div>
+
+  <div id="content">
+
+<!-- ██ TEAMS MEETINGS — WELCOME / ONBOARDING ██████████████████████████████ -->
+<div class="panel active" id="p-tm">
+
+  <!-- AI background canvas -->
+  <canvas id="tm-bg-canvas"></canvas>
+
+  <!-- Large background falcon silhouette — blue-on-blue tonal -->
+  <div id="tm-falcon-bg" style="position:fixed;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden">
+    <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg"
+         style="width:92vw;max-width:1100px;opacity:0.18">
+      <!-- Body -->
+      <path d="M500 240 Q493 275 490 320 Q492 365 500 410 Q508 365 510 320 Q507 275 500 240Z" fill="#2563eb"/>
+      <!-- Head -->
+      <ellipse cx="500" cy="220" rx="22" ry="28" fill="#2563eb"/>
+      <!-- Hooked beak -->
+      <path d="M514 208 Q540 220 522 234 Q516 222 514 208Z" fill="#2563eb"/>
+      <!-- Left wing upper -->
+      <path d="M492 295 Q455 265 385 252 Q305 238 210 252 Q130 264 55 278
+               Q105 292 175 293 Q255 294 335 282 Q405 272 452 278
+               Q466 290 468 308 Q456 334 432 355 Q400 376 362 390 Q330 400 298 404
+               Q342 402 385 390 Q428 376 460 354 Q480 338 490 316 Z" fill="#2563eb"/>
+      <!-- Left wing lower -->
+      <path d="M452 278 Q420 310 395 340 Q370 368 352 392
+               Q380 378 410 358 Q440 336 458 308 Z" fill="#1d4ed8" opacity="0.7"/>
+      <!-- Right wing upper -->
+      <path d="M508 295 Q545 265 615 252 Q695 238 790 252 Q870 264 945 278
+               Q895 292 825 293 Q745 294 665 282 Q595 272 548 278
+               Q534 290 532 308 Q544 334 568 355 Q600 376 638 390 Q670 400 702 404
+               Q658 402 615 390 Q572 376 540 354 Q520 338 510 316 Z" fill="#2563eb"/>
+      <!-- Right wing lower -->
+      <path d="M548 278 Q580 310 605 340 Q630 368 648 392
+               Q620 378 590 358 Q560 336 542 308 Z" fill="#1d4ed8" opacity="0.7"/>
+      <!-- Tail feathers -->
+      <path d="M493 408 Q484 448 474 490 Q482 484 488 490 Q491 468 494 450
+               Q497 468 500 490 Q503 468 506 450 Q509 468 512 490 Q518 484 526 490
+               Q516 448 507 408 Z" fill="#2563eb"/>
+    </svg>
+  </div>
+
+  <!-- ── SETUP FORM (not connected) ────────────────────────────── -->
+  <div id="ews-setup-form">
+
+    <!-- Welcome header — no icon, just text -->
+    <div id="tm-welcome-wrap" style="text-align:center;margin-bottom:30px">
+      <h2 style="font-size:36px;font-weight:800;margin:0 0 12px;letter-spacing:-.5px">Welcome to Falcon App</h2>
+      <p style="font-size:15px;margin:0;line-height:1.7">Connect your Exchange account to unlock meetings calendar and email features</p>
+    </div>
+
+    <div class="card">
+        <div class="card-hd" style="margin-bottom:16px">
+          <span class="card-title"><i class="ti ti-server"></i>Connect to Exchange</span>
+          <span id="ews-notconn-badge" class="badge" style="background:var(--surface2);color:var(--muted);font-size:10px">Not connected</span>
+        </div>
+
+        <!-- Steps -->
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">
+          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
+            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</span>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Enter your Exchange username / email</strong> — your corporate AD account (e.g. you@yourcompany.com)</div>
+          </div>
+          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
+            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</span>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Auto-detect server URL</strong> — click <em>Auto-detect</em> or enter the EWS URL manually</div>
+          </div>
+          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
+            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</span>
+            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Click Connect &amp; Sync</strong> — the app syncs your meetings, calendar and emails</div>
+          </div>
+        </div>
+
+        <!-- Credentials form -->
+        <label>Username / Email</label>
+        <input id="ews-username" placeholder="you@yourcompany.com" style="margin-bottom:10px"
+          oninput="ewsCheckInputs()">
+
+        <label>Password</label>
+        <div style="position:relative;margin-bottom:10px">
+          <input id="ews-password" type="password" placeholder="Your Active Directory password"
+            style="margin-bottom:0;padding-right:40px;width:100%;box-sizing:border-box"
+            oninput="ewsCheckInputs()"
+            onkeydown="if(event.key==='Enter' && !document.getElementById('ews-connect-btn').disabled) ewsConnect(document.getElementById('ews-connect-btn'))">
+          <button type="button" onclick="(function(){var i=document.getElementById('ews-password');var b=document.getElementById('ews-pw-eye');i.type=i.type==='password'?'text':'password';b.className='ti '+(i.type==='password'?'ti-eye':'ti-eye-off')})()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:0;line-height:1"><i id="ews-pw-eye" class="ti ti-eye"></i></button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <label style="margin:0;flex:1">Exchange server URL</label>
+          <button class="sm" onclick="ewsDiscover(this)" id="ews-discover-btn">
+            <i class="ti ti-search"></i> Auto-detect
+          </button>
+        </div>
+        <input id="ews-url"
+          style="font-family:var(--mono);font-size:12px;margin-bottom:6px"
+          placeholder="https://owa.yourcompany.com/EWS/Exchange.asmx">
+        <div id="ews-discover-results" style="display:none;margin-bottom:10px"></div>
+
+        <div id="ews-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px;padding:8px 10px;background:rgba(220,38,38,.07);border-radius:var(--r-sm)"></div>
+
+        <button class="primary" id="ews-connect-btn" onclick="ewsConnect(this)" disabled
+          style="width:100%;justify-content:center;padding:13px;font-size:14px;font-weight:600;letter-spacing:.3px;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;box-shadow:0 4px 20px rgba(79,70,229,.45);margin-top:4px;transition:filter .15s,transform .15s,box-shadow .15s">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:7px;vertical-align:middle"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Connect &amp; Sync
+        </button>
+    </div>
+  </div>
+
+  <!-- ── CONNECTED STATE (after successful connect) ─────────────── -->
+  <div id="ews-connected-state" style="display:none">
+
+    <!-- Status bar -->
+    <div class="card" style="margin-bottom:14px;padding:11px 16px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="width:32px;height:32px;background:var(--green-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ti ti-circle-check" style="font-size:17px;color:var(--green)"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="ews-user-label">Connected</div>
+          <div style="font-size:11px;color:var(--muted)" id="ews-last-sync-lbl">Exchange active</div>
+        </div>
+        <span id="ews-status-badge" class="badge b-green" style="font-size:10px">Synced</span>
+        <button class="sm primary" onclick="ewsSync(this)"><i class="ti ti-refresh"></i> Sync now</button>
+        <button class="sm" onclick="ewsToggleAutoSync(this)" id="ews-autosync-btn"><i class="ti ti-refresh"></i> Auto-sync on</button>
+        <button class="sm" onclick="ewsDisconnect()" title="Sign out"><i class="ti ti-logout"></i> Sign out</button>
+      </div>
+    </div>
+
+    <!-- Two-column: meeting list + detail/MOM -->
+    <div class="g2">
+
+      <!-- Left: meeting list + ICS import -->
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-hd">
+            <span class="card-title"><i class="ti ti-calendar-event"></i>Meetings</span>
+            <span class="badge b-blue" id="meetings-count" style="display:none">0</span>
+          </div>
+          <div id="teams-list">
+            <div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center">
+              <i class="ti ti-calendar-import" style="display:block;font-size:24px;margin-bottom:8px;color:var(--border)"></i>
+              Syncing from Exchange…
+            </div>
+          </div>
+        </div>
+
+        <!-- ICS import -->
+        <div class="card">
+          <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-import"></i>Import .ics calendar</span></div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text)">
+              <i class="ti ti-upload"></i>
+              <span id="ics-file-name">Choose .ics file</span>
+              <input type="file" id="ics-file-input" accept=".ics" style="display:none" onchange="importICS(this)">
+            </label>
+            <button class="sm" onclick="clearICSMeetings()"><i class="ti ti-trash"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: meeting detail + MOM output -->
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-hd"><span class="card-title"><i class="ti ti-info-circle"></i>Meeting detail</span></div>
+          <div id="meeting-detail" style="font-size:13px;color:var(--muted)">Select a meeting to preview details and generate MOM.</div>
+        </div>
+        <div class="card" id="mom-tm-output" style="display:none">
+          <div class="card-hd">
+            <span class="card-title"><i class="ti ti-notes"></i>Minutes of Meeting</span>
+            <div style="display:flex;gap:5px">
+              <button class="sm" onclick="copyText('mom-tm-text')"><i class="ti ti-copy" style="font-size:12px"></i></button>
+              <button class="sm" onclick="downloadMOM()"><i class="ti ti-download" style="font-size:12px"></i></button>
+            </div>
+          </div>
+          <div class="term" id="mom-tm-text" style="min-height:80px"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ██ OVERVIEW ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-ov">
+  <div id="ov-reminder"></div>
+  <!-- Project + AI platform setup -->
+  <div class="card" id="ov-setup-card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-rocket"></i>Project &amp; AI setup</span><span id="ov-setup-hint" style="font-size:11px;color:var(--muted);font-weight:400">Configure once — applies across all features</span></div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:160px">
+        <label>Project name</label>
+        <input id="ov-project" placeholder="Enter your Project Name..." style="margin-bottom:4px;width:100%;box-sizing:border-box" onkeydown="if(event.key==='Enter') submitProjectSetup()" oninput="document.getElementById('ov-project-err').style.display='none';this.style.border=''">
+        <div id="ov-project-err" style="display:none;font-size:11px;color:var(--red);margin-bottom:0">Project name is required.</div>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <label>AI platform</label>
+        <select id="ov-ai-platform" style="margin-bottom:0;width:100%;box-sizing:border-box">
+          <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+          <option value="ollama">🦙 Ollama — Local LLM</option>
+          <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+        </select>
+      </div>
+      <button class="primary" style="height:36px;padding:0 20px;flex-shrink:0;display:inline-flex;align-items:center;gap:6px" onclick="submitProjectSetup()">
+        <i class="ti ti-check"></i> Submit
+      </button>
+    </div>
+  </div>
+  <!-- Prompt shown before setup is submitted -->
+  <div id="ov-setup-prompt" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px;text-align:center">
+    <div style="width:52px;height:52px;background:var(--surface2);border-radius:14px;display:flex;align-items:center;justify-content:center">
+      <i class="ti ti-layout-dashboard" style="font-size:26px;color:var(--blue)"></i>
+    </div>
+    <div style="font-size:15px;font-weight:600;color:var(--text)">Enter project &amp; AI details to view Dashboard</div>
+    <div style="font-size:13px;color:var(--muted);max-width:340px;line-height:1.6">Fill in the Project name and select an AI platform above, then click <strong>Submit</strong> to unlock the full dashboard.</div>
+  </div>
+
+  <!-- Main dashboard content — revealed after project setup -->
+  <div id="ov-main-content" style="display:none">
+  <!-- Stat cards — all populated dynamically from EWS + DOCS -->
+  <div class="g4">
+    <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar-event"></i>Meetings today</div><div class="stat-value" id="stat-today-meetings">—</div><div class="stat-sub" id="stat-today-sub">Connect Exchange</div></div>
+    <div class="stat-card green"><div class="stat-label"><i class="ti ti-calendar-week"></i>This week</div><div class="stat-value" id="stat-week-meetings">—</div><div class="stat-sub" id="stat-week-sub">Connect Exchange</div></div>
+    <div class="stat-card amber"><div class="stat-label"><i class="ti ti-file-check"></i>Documents tracked</div><div class="stat-value" id="stat-docs">0</div><div class="stat-sub" id="stat-docs-sub">Add in Documents tab</div></div>
+    <div class="stat-card red"><div class="stat-label"><i class="ti ti-mail"></i>Unread emails</div><div class="stat-value" id="stat-unread">—</div><div class="stat-sub" id="stat-unread-sub">Connect Exchange</div></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-event"></i>Today's meetings</span><span class="badge b-blue" id="today-count">—</span></div>
+      <div id="ov-meetings"><div style="font-size:13px;color:var(--muted);padding:16px 0;text-align:center"><i class="ti ti-plug" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Exchange in Teams panel to see today's meetings</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-time"></i>Upcoming meetings</span><span class="badge b-blue" id="upcoming-count">—</span></div>
+      <div id="ov-upcoming"><div style="font-size:13px;color:var(--muted);padding:16px 0;text-align:center"><i class="ti ti-plug" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Exchange to see upcoming meetings</div></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-chart-bar"></i>Meeting activity this week</span></div>
+      <div id="meeting-activity"><div style="font-size:12px;color:var(--muted);text-align:center;padding:32px 0"><i class="ti ti-plug" style="font-size:22px;display:block;margin-bottom:6px;color:var(--border)"></i>Sync Exchange to see meeting activity</div></div>
+      <div style="position:relative;height:90px;margin-top:8px;display:none" id="health-chart-wrap"><canvas id="health-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-chart-donut"></i>Document status</span></div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div style="position:relative;width:90px;height:90px;flex-shrink:0"><canvas id="doc-chart"></canvas></div>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#059669;flex-shrink:0"></span><span style="color:var(--muted)">Approved</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right" id="doc-count-approved">0</span></div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#d97706;flex-shrink:0"></span><span style="color:var(--muted)">Pending/Draft</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right" id="doc-count-pending">0</span></div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;flex-shrink:0"></span><span style="color:var(--muted)">Overdue</span><span style="font-weight:500;margin-left:auto;min-width:20px;text-align:right" id="doc-count-overdue">0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /ov-main-content -->
+</div>
+
+<!-- ██ CALENDAR ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-cal">
+  <div id="cal-reminder"></div>
+  <div class="g2" style="align-items:start">
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="cal-nav"><button class="sm" onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button><span class="cal-month" id="cal-month-lbl"></span><button class="sm" onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button><button class="sm" style="margin-left:auto" id="cal-sync-btn" onclick="syncOutlookCalendar(this)"><i class="ti ti-refresh"></i> Sync Exchange</button></div>
+        <div id="cal-sync-status" style="font-size:11px;color:var(--muted);padding:3px 0;min-height:16px"></div>
+        <div class="cal-grid" id="cal-header"></div>
+        <div class="cal-grid" id="cal-cells"></div>
+      </div>
+      <div class="card">
+        <div class="card-hd" style="margin-bottom:14px">
+          <span class="card-title"><i class="ti ti-calendar-plus"></i>Create Meeting</span>
+          <select id="ev-type" style="margin:0;font-size:12px;width:130px">
+            <option value="meet">Meeting</option>
+            <option value="review">Review</option>
+            <option value="deadline">Deadline</option>
+            <option value="block">Focus block</option>
+          </select>
+        </div>
+
+        <label>Subject</label>
+        <input id="ev-title" placeholder="e.g. Sprint Review, Architecture Discussion…" style="margin-bottom:10px">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <label>Start date</label>
+            <input type="date" id="ev-date" style="margin-bottom:0">
+          </div>
+          <div>
+            <label>Start time</label>
+            <input id="ev-time" value="10:00 AM" placeholder="10:00 AM" style="margin-bottom:0">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <label>Duration</label>
+            <select id="ev-dur" style="margin-bottom:0">
+              <option>15 min</option><option>30 min</option><option selected>45 min</option>
+              <option>60 min</option><option>90 min</option><option>120 min</option>
+            </select>
+          </div>
+          <div>
+            <label>Location</label>
+            <input id="ev-location" placeholder="Room / Teams link" style="margin-bottom:0">
+          </div>
+        </div>
+
+        <label>Attendees <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(comma-separated emails)</span></label>
+        <input id="ev-att" placeholder="e.g. vijay@company.com, aditya@company.com" style="margin-bottom:10px">
+
+        <label>Agenda / Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+        <textarea id="ev-desc" rows="2" placeholder="Meeting agenda or description…" style="resize:vertical;margin-bottom:12px;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface2);color:var(--text);width:100%;box-sizing:border-box;font-family:inherit"></textarea>
+
+        <button class="primary" id="ev-add-btn" onclick="addEvent()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px">
+          <i class="ti ti-send"></i> Create &amp; Send Invite
+        </button>
+        <div id="ev-invite-status" style="display:none;margin-top:8px;font-size:12px;padding:8px 10px;border-radius:var(--r-sm)"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-clock"></i>Schedule — <span id="sch-date-lbl" style="color:var(--blue);font-weight:500;font-size:12px;text-transform:none;letter-spacing:0"></span></span><span class="badge b-blue" id="sch-count">0</span></div>
+      <div id="day-schedule"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ TEAMS CHAT ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-tc">
+
+  <!-- Session bar -->
+  <div class="card" style="margin-bottom:14px;padding:11px 16px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="width:32px;height:32px;background:#6264a7;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="ti ti-brand-teams" style="font-size:17px;color:#fff"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">Teams Chat</div>
+        <div style="font-size:11px;color:var(--muted)" id="tc-sync-lbl"></div>
+      </div>
+      <button class="sm primary" id="tc-sync-btn" onclick="syncTeamsChats(this)">
+        <i class="ti ti-refresh"></i> Sync chats
+      </button>
+    </div>
+  </div>
+
+  <!-- No token / permission error card -->
+  <div id="tc-no-token" class="card" style="margin-bottom:14px">
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <div style="width:40px;height:40px;background:rgba(98,100,167,.12);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+        <i class="ti ti-brand-teams" style="font-size:22px;color:#6264a7"></i>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:5px">Connect Microsoft 365</div>
+        <div class="tc-no-token-msg" style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px">
+          Connect your Microsoft 365 account to sync Teams chats directly inside Falcon.
+        </div>
+        <button class="primary sm" onclick="window.open('https://teams.cloud.microsoft/','_blank')">
+          <i class="ti ti-brand-teams"></i> Open Teams while connecting
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat list + messages (shown after sync) -->
+  <div id="tc-chat-ui" style="display:none" class="g2">
+    <!-- Left: conversation list -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:500;color:var(--text)">Conversations</span>
+        <span class="badge b-blue" id="tc-chat-count" style="display:none">0</span>
+      </div>
+      <div id="tc-chat-list">
+        <div style="font-size:12px;color:var(--hint);padding:20px 0;text-align:center">
+          <i class="ti ti-message-dots" style="display:block;font-size:26px;margin-bottom:8px;color:var(--border)"></i>
+          Click "Sync chats" to load your Teams conversations.
+        </div>
+      </div>
+    </div>
+    <!-- Right: messages panel -->
+    <div>
+      <div id="tc-messages-panel" class="card" style="font-size:13px;color:var(--muted);min-height:220px;display:flex;align-items:center;justify-content:center">
+        <div style="text-align:center">
+          <i class="ti ti-message-2" style="display:block;font-size:28px;margin-bottom:8px;color:var(--border)"></i>
+          Select a conversation to view messages
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ██ WEEKLY REPORT ███████████████████████████████████████████████████████ -->
+<div class="panel" id="p-wr">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch">
+    <!-- Reporter details -->
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-user"></i>Reporter details</span></div>
+      <label>Name</label><input id="rp-name" placeholder="Your full name">
+      <label>Department</label><input id="rp-dept" placeholder="e.g. Technology, Product, QA">
+      <label>Start time</label><input type="datetime-local" id="rp-start">
+      <label>End time</label><input type="datetime-local" id="rp-end">
+    </div>
+    <!-- AI + context -->
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-robot"></i>AI</span></div>
+      <label>Which AI to use</label>
+      <select id="rp-provider" style="margin-bottom:12px" onchange="localStorage.setItem('ai_provider',this.value)">
+        <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+        <option value="ollama">🦙 Ollama — Local LLM</option>
+        <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+      </select>
+      <label>Additional context <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(optional — what you worked on, key achievements…)</span></label>
+      <textarea id="rp-context" rows="3" placeholder="Describe your work..." style="width:100%;resize:vertical;flex:1;min-height:72px;margin-bottom:12px"></textarea>
+      <button class="primary" style="margin-top:auto" onclick="generateReport()"><i class="ti ti-bolt"></i> Generate report</button>
+    </div>
+  </div>
+
+  <!-- Output section — hidden until report is generated -->
+  <div class="card" id="rp-output-card" style="display:none">
+    <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span class="card-title" style="flex-shrink:0"><i class="ti ti-file-text"></i>Weekly report</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="sm" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="clearReport()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button>
+        <select id="rp-dl-fmt" style="font-size:12px;padding:0 8px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text)">
+          <option value="pdf">PDF</option>
+          <option value="doc">Word (.doc)</option>
+        </select>
+        <button class="sm primary" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="downloadReport()"><i class="ti ti-download" style="font-size:12px"></i> Download</button>
+      </div>
+    </div>
+    <div class="term" id="rp-output" style="max-height:520px"></div>
+  </div>
+</div>
+
+<!-- ██ MOM ████████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-mm">
+
+  <!-- Transcribe recording -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-microphone"></i>Transcribe meeting recording</span><span class="badge" style="background:var(--surface2);color:var(--muted);font-size:10px">Groq Whisper</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Upload any meeting recording (.mp3 / .wav / .mp4 / .m4a) — up to 500 MB. Large video files are automatically converted to audio and chunked before transcription.</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;color:var(--text);flex-shrink:0">
+        <i class="ti ti-upload"></i><span id="tr-file-name">Choose recording</span>
+        <input type="file" id="tr-file-input" accept=".mp3,.wav,.mp4,.m4a,.webm,.ogg" style="display:none" onchange="onTranscribeFileChosen(this)">
+      </label>
+      <button class="primary sm" id="tr-btn" onclick="transcribeRecording(this)" disabled><i class="ti ti-wand"></i> Transcribe</button>
+      <span id="tr-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="tr-result" style="display:none">
+      <label>Transcript <span style="color:var(--green);font-size:11px;font-weight:400"><i class="ti ti-circle-check" style="font-size:11px"></i> Auto-loaded into MOM generator</span></label>
+      <textarea id="tr-transcript" rows="6" style="width:100%;resize:vertical;font-size:12px;font-family:var(--mono)" placeholder="Transcript will appear here..."></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span class="card-title"><i class="ti ti-clipboard"></i>MOM Generator</span></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px">
+      <label style="margin:0">Transcript</label>
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text);white-space:nowrap">
+        <i class="ti ti-file-upload" style="font-size:13px"></i> Upload transcript
+        <input type="file" id="mm-transcript-file" accept=".txt,.vtt,.srt,.md,.docx" style="display:none" onchange="onMOMTranscriptFileChosen(this)">
+      </label>
+    </div>
+    <!-- Shown when transcript is auto-loaded from the Transcribe section above -->
+    <div id="mm-transcript-loaded" style="display:none;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:12px">
+      <i class="ti ti-circle-check" style="color:var(--green);font-size:14px"></i>
+      <span id="mm-transcript-loaded-label">Transcript loaded from recording</span>
+      <button onclick="clearAutoTranscript()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0">&#x2715; Clear</button>
+    </div>
+    <!-- Shown when user pastes or uploads manually -->
+    <textarea id="mm-transcript-input" rows="6" style="width:100%;resize:vertical;font-size:12px;font-family:var(--mono);margin-bottom:12px" placeholder="Paste your meeting transcript here, or upload a .txt / .vtt / .srt / .docx file…" oninput="onMOMTranscriptChange()"></textarea>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label>Meeting title <span style="color:var(--muted);font-size:11px;font-weight:400">(optional)</span></label>
+        <input type="text" id="mm-title-input" placeholder="e.g. Sprint Planning" style="width:100%">
+      </div>
+      <div>
+        <label>Date <span style="color:var(--muted);font-size:11px;font-weight:400">(optional)</span></label>
+        <input type="date" id="mm-date-input" style="width:100%">
+      </div>
+    </div>
+    <label>Attendees <span style="color:var(--muted);font-size:11px;font-weight:400">(optional, comma-separated)</span></label>
+    <input type="text" id="mm-attendees-input" placeholder="e.g. Alice, Bob, Carol" style="width:100%;margin-bottom:14px">
+
+    <details style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--muted);user-select:none"><i class="ti ti-calendar" style="font-size:11px"></i> Auto-fill from calendar meeting (optional)</summary>
+      <div style="margin-top:8px">
+        <select id="mm-meeting-select" onchange="onMOMSelectChange()">
+          <option value="">— sync calendar to load meetings —</option>
+        </select>
+        <div id="mm-meeting-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:var(--muted);margin-top:8px;line-height:1.8"></div>
+      </div>
+    </details>
+
+    <button class="primary" id="mm-gen-btn" onclick="generateMOM()" disabled><i class="ti ti-bolt"></i> Generate MOM</button>
+  </div>
+  <div class="card" id="mm-output-card" style="display:none">
+    <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span class="card-title" style="flex-shrink:0"><i class="ti ti-file-text"></i>Minutes of Meeting</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="sm" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="copyText('mom-output')"><i class="ti ti-copy" style="font-size:12px"></i> Copy</button>
+        <select id="mm-dl-fmt" style="font-size:12px;padding:0 8px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text)">
+          <option value="pdf">PDF</option>
+          <option value="doc">Word (.doc)</option>
+        </select>
+        <button class="sm primary" style="height:30px;display:inline-flex;align-items:center;gap:5px" onclick="downloadMOMDoc()"><i class="ti ti-download" style="font-size:12px"></i> Download</button>
+      </div>
+    </div>
+    <div class="term" id="mom-output" style="max-height:520px"></div>
+  </div>
+</div>
+
+<!-- ██ STANDUP ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-su">
+  <div class="g2">
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-pencil"></i>Your input</span></div>
+      <label>Yesterday completed</label><textarea id="su-done" placeholder="What did you complete or work on yesterday?"></textarea>
+      <label>Today's plan</label><textarea id="su-today" placeholder="What are you focusing on today?"></textarea>
+      <label>Blockers <span style="font-weight:400;color:var(--hint)">(optional)</span></label><input id="su-blockers" placeholder="Any blockers or dependencies?">
+      <label>Tone</label><select id="su-format"><option value="casual">Casual — conversational (recommended)</option><option value="professional">Professional — polished but natural</option></select>
+      <div class="btn-row"><button class="primary" onclick="generateStandup()"><i class="ti ti-bolt"></i> Generate</button><button onclick="loadYesterday()">Load yesterday</button></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-send"></i>Output</span><div style="display:flex;gap:5px"><button class="sm" onclick="copyText('su-output')"><i class="ti ti-copy" style="font-size:12px"></i></button><button class="sm"><i class="ti ti-device-desktop" style="font-size:12px"></i></button></div></div>
+      <div class="term" id="su-output" style="min-height:230px;font-family:var(--font);font-size:14px;line-height:1.75;white-space:pre-wrap">Fill in what you did yesterday and what you're doing today, then click Generate ⚡</div>
+    </div>
+  </div>
+
+  <!-- Manager Q&A — shown after standup is generated -->
+  <div class="card" id="su-qa-section" style="display:none;margin-top:12px">
+    <div class="card-hd" style="margin-bottom:10px">
+      <span class="card-title"><i class="ti ti-messages"></i>Manager Q&amp;A</span>
+      <span style="font-size:12px;color:var(--muted)">Simulate questions your manager might ask</span>
+    </div>
+    <div id="su-qa-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+    <div id="su-qa-history" class="chat-msgs" style="max-height:320px;margin-bottom:12px"></div>
+    <div style="display:flex;align-items:center;gap:0;border:1.5px solid var(--blue);border-radius:999px;background:var(--surface);overflow:hidden;padding:0 4px 0 14px">
+      <i class="ti ti-search" style="color:var(--muted);font-size:15px;flex-shrink:0;margin-right:8px"></i>
+      <input id="su-qa-input" type="text" placeholder="Ask a manager question…" style="flex:1;border:none;background:transparent;outline:none;font-size:13px;height:42px;color:var(--text);padding:0" onkeydown="if(event.key==='Enter'){event.preventDefault();standupQA()}">
+      <span style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.04em;padding:0 10px;border-right:1px solid var(--border);margin-right:4px;white-space:nowrap">⚡ Groq</span>
+      <button class="primary" onclick="standupQA()" style="height:34px;padding:0 16px;border-radius:999px;font-size:13px;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-send" style="font-size:13px"></i> Answer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ██ DOCUMENTS ███████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-dc">
+  <!-- SharePoint sync card -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd" style="margin-bottom:10px">
+      <span class="card-title"><i class="ti ti-brand-sharepoint" style="color:#0078d4"></i>SharePoint Documents</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="sp-sync-user" style="font-size:11px;color:var(--muted)"></span>
+        <button class="sm" id="sp-sync-btn" onclick="syncSharePointDocs(this)">
+          <i class="ti ti-refresh"></i> Sync
+        </button>
+      </div>
+    </div>
+
+    <!-- Source selector: Recent files vs Site -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;flex-shrink:0">
+        <button id="sp-src-recent" onclick="spSetSource('recent',this)"
+          style="padding:5px 12px;font-size:12px;border:none;background:var(--blue);color:#fff;cursor:pointer;font-weight:500">
+          <i class="ti ti-clock"></i> Recent files
+        </button>
+        <button id="sp-src-site" onclick="spSetSource('site',this)"
+          style="padding:5px 12px;font-size:12px;border:none;background:var(--surface2);color:var(--muted);cursor:pointer">
+          <i class="ti ti-building"></i> By site
+        </button>
+      </div>
+      <!-- Site selector — shown only in "By site" mode -->
+      <div id="sp-site-row" style="display:none;flex:1;min-width:200px;display:none;gap:6px;align-items:center">
+        <select id="sp-site-select" style="flex:1;margin:0;font-size:12px" onchange="spOnSiteChange()">
+          <option value="">— select a site —</option>
+        </select>
+        <button class="sm" onclick="loadSpSites(this)"><i class="ti ti-refresh"></i> Load sites</button>
+      </div>
+    </div>
+
+    <div id="sp-sync-status" style="display:none;font-size:12px;padding:7px 10px;border-radius:var(--r-sm);margin-bottom:4px"></div>
+
+    <!-- Inline M365 connect notice (shown when no token) -->
+    <div id="dc-connect-hint" style="display:none;background:rgba(0,120,212,.07);border:1px solid rgba(0,120,212,.22);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--muted)">
+      <i class="ti ti-info-circle" style="color:#0078d4;margin-right:5px"></i>
+      Microsoft 365 not connected — files will be saved locally. Paste your token above to also sync to SharePoint.
+    </div>
+
+    <!-- Upload row -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+      <label id="dc-file-lbl" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--text);flex-shrink:0;white-space:nowrap">
+        <i class="ti ti-file-plus"></i><span id="dc-file-name">Choose file (.pdf / .docx)</span>
+        <input type="file" id="dc-file-input" accept=".pdf,.doc,.docx" style="display:none" onchange="onDocFileChosen(this)">
+      </label>
+      <input id="dc-upload-path" placeholder="SharePoint folder URL or path e.g. Documents/BA Hub" style="flex:1;margin:0;min-width:180px;font-size:12px">
+      <button class="sm" onclick="uploadDocFromForm(this)" style="flex-shrink:0"><i class="ti ti-upload"></i> Upload</button>
+    </div>
+    <div id="dc-upload-status" style="display:none;font-size:12px;margin-top:8px;color:var(--muted)"></div>
+  </div>
+
+  <!-- Filter + search -->
+  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+    <select id="doc-filter" onchange="filterDocs()" style="width:130px;margin:0;font-size:13px"><option value="">All statuses</option><option>Approved</option><option>Pending</option><option>Draft</option><option>Delivered</option></select>
+    <input id="doc-search" oninput="filterDocs()" placeholder="Search documents..." style="flex:1;margin:0">
+  </div>
+
+  <div class="tbl-wrap" style="margin-bottom:10px">
+    <table><thead><tr><th style="width:42%">Document</th><th style="width:11%">Ver</th><th style="width:20%">Status</th><th style="width:27%">Updated</th></tr></thead>
+    <tbody id="doc-tbody"></tbody></table>
+  </div>
+  <div id="doc-detail" style="display:none" class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+      <span style="font-size:14px;font-weight:500;color:var(--text)" id="doc-detail-name"></span>
+      <button class="sm" onclick="document.getElementById('doc-detail').style.display='none'"><i class="ti ti-x" style="font-size:12px"></i></button>
+    </div>
+    <div id="doc-detail-body" style="font-size:13px;color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- ██ LEAVE ████████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-lv">
+  <div class="g4">
+    <div class="stat-card green"><div class="stat-label"><i class="ti ti-users"></i>Available today</div><div class="stat-value" id="lv-avail-count">0</div><div class="stat-sub" id="lv-total-sub">of 0 members</div></div>
+    <div class="stat-card amber"><div class="stat-label"><i class="ti ti-beach"></i>On leave</div><div class="stat-value" id="lv-leave-count">0</div><div class="stat-sub" id="lv-leave-names">—</div></div>
+    <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar"></i>Planned leaves</div><div class="stat-value" id="lv-planned-count">0</div><div class="stat-sub">Next 2 weeks</div></div>
+    <div class="stat-card red"><div class="stat-label"><i class="ti ti-alert-circle"></i>Unplanned</div><div class="stat-value" id="lv-unplanned-count">0</div></div>
+  </div>
+  <div class="g2">
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hd">
+          <span class="card-title"><i class="ti ti-users"></i>Team members</span>
+          <button class="sm" onclick="syncLeaveFromExchange(this)"><i class="ti ti-refresh"></i> Sync from Exchange</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="stakeholder-tbody">
+              <tr id="lv-empty-row"><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;font-size:12px">No members yet — add one below.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Add member form -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:130px"><label style="font-size:11px;margin-bottom:3px;display:block">Name</label><input id="lv-new-name" placeholder="Full name" style="margin:0"></div>
+          <div style="flex:1;min-width:130px"><label style="font-size:11px;margin-bottom:3px;display:block">Role</label><input id="lv-new-role" placeholder="e.g. Developer, BA, QA" style="margin:0" onkeydown="if(event.key==='Enter')addTeamMember()"></div>
+          <button class="sm primary" style="height:34px;flex-shrink:0;margin-top:18px" onclick="addTeamMember()"><i class="ti ti-plus"></i> Add</button>
+        </div>
+        <div id="lv-sync-status" style="display:none;font-size:12px;color:var(--muted);margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--r-sm)"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title"><i class="ti ti-calendar-plus"></i>Apply for leave</span></div>
+      <label>Leave type</label><select id="lv-type"><option>Planned leave</option><option>Sick leave</option><option>Work from home</option><option>Half day</option></select>
+      <div class="g2" style="gap:8px"><div><label>From date</label><input type="date" id="lv-from"></div><div><label>To date</label><input type="date" id="lv-to"></div></div>
+      <label>Reason</label><textarea id="lv-reason" style="min-height:50px" placeholder="Brief reason for leave..."></textarea>
+      <label>To (Manager email)</label><input type="email" id="lv-to-email" placeholder="manager@company.com">
+      <label>CC (HR email)</label><input type="email" id="lv-cc-email" placeholder="hr@company.com">
+      <div class="btn-row">
+  <button class="primary" onclick="applyLeave()"><i class="ti ti-calendar-check"></i> Apply Leave</button>
+  <button onclick="generateLeaveEmail()"><i class="ti ti-mail"></i> Generate email</button>
+  <button onclick="sendLeaveEmail(this)"><i class="ti ti-send"></i> Send via Outlook</button>
+</div>
+      <div id="lv-email-controls" style="display:none;margin-top:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:11px;color:var(--muted)"><i class="ti ti-pencil" style="font-size:10px"></i> Click the text below to edit manually</span>
+          <div style="display:flex;gap:5px">
+            <button class="sm" onclick="generateLeaveEmail()"><i class="ti ti-refresh"></i> Regenerate</button>
+            <button class="sm" onclick="clearLeaveEmail()"><i class="ti ti-trash"></i> Clear</button>
+            <button class="sm" onclick="copyText('lv-output')"><i class="ti ti-copy"></i> Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="term" id="lv-output" contenteditable="true" spellcheck="true" style="display:none;min-height:80px;cursor:text;outline:none;white-space:pre-wrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ OUTLOOK ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-ol">
+
+  <!-- connection status bar -->
+  <div class="card" style="margin-bottom:12px;padding:10px 14px;display:flex;align-items:center;gap:10px" id="ol-token-status">
+    <i class="ti ti-server" style="font-size:16px;color:var(--blue);flex-shrink:0"></i>
+    <div style="font-size:12px;color:var(--muted);flex:1">
+      <span id="ol-ews-hint">Uses your Exchange credentials from the Teams panel. <strong>Connect in Teams first.</strong></span>
+      <span id="ol-ews-ok" style="display:none;color:var(--green)"><i class="ti ti-circle-check" style="font-size:11px"></i> Exchange connected — inbox synced from EWS</span>
+    </div>
+    <button class="sm" onclick="window.showOlCompose()" style="gap:5px"><i class="ti ti-pencil-plus"></i> Compose</button>
+    <button class="sm primary" onclick="syncEWSEmails(this)"><i class="ti ti-refresh"></i> Load inbox</button>
+  </div>
+
+  <!-- compose new email (hidden by default) -->
+  <div id="ol-compose-area" style="display:none;margin-bottom:12px">
+    <div class="card">
+      <div class="card-hd" style="margin-bottom:12px">
+        <span class="card-title"><i class="ti ti-mail-forward"></i>New Email</span>
+        <button class="sm" onclick="document.getElementById('ol-compose-area').style.display='none'" style="padding:3px 8px;font-size:11px"><i class="ti ti-x"></i> Close</button>
+      </div>
+      <label>To</label>
+      <input id="ol-compose-to" type="email" placeholder="recipient@company.com" style="margin-bottom:8px">
+      <label>CC <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input id="ol-compose-cc" type="email" placeholder="cc@company.com" style="margin-bottom:8px">
+      <label>Subject</label>
+      <input id="ol-compose-subject" placeholder="Email subject" style="margin-bottom:8px">
+      <label>Message</label>
+      <textarea id="ol-compose-body" rows="6" placeholder="Type your message here…" style="resize:vertical;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface2);color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;margin-bottom:10px"></textarea>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="primary" id="ol-compose-send-btn" onclick="sendComposedEmail(this)" style="display:flex;align-items:center;gap:6px;padding:9px 18px"><i class="ti ti-send"></i> Send Email</button>
+        <button onclick="window.aiDraftCompose()" style="display:flex;align-items:center;gap:6px;font-size:12px"><i class="ti ti-wand"></i> AI Draft</button>
+        <div id="ol-compose-status" style="font-size:12px;display:none;padding:6px 10px;border-radius:var(--r-sm);flex:1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- inbox + detail -->
+  <div class="g2">
+    <div>
+      <div id="ol-list" style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:12px;color:var(--hint);padding:24px 0;text-align:center"><i class="ti ti-mail" style="display:block;font-size:22px;margin-bottom:6px;color:var(--border)"></i>Connect Exchange in the Teams panel, then click Load inbox.</div>
+      </div>
+    </div>
+    <div>
+      <div id="ol-detail" class="card" style="font-size:13px;color:var(--muted)">Select an email to view and draft an AI reply.</div>
+      <div id="ol-draft-section" style="display:none;margin-top:10px">
+        <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:7px">AI-drafted reply <span style="font-weight:400;color:var(--muted);font-size:11px">(powered by Groq &middot; <i class="ti ti-pencil" style="font-size:11px"></i> click to edit)</span></div>
+        <div class="term" id="ol-draft-text" contenteditable="true" style="min-height:120px;cursor:text;outline:none" spellcheck="true"></div>
+        <div class="btn-row" style="margin-top:8px">
+          <button onclick="copyText('ol-draft-text')"><i class="ti ti-copy"></i> Copy</button>
+          <button onclick="sendOutlookDraft()"><i class="ti ti-send"></i> Send Reply</button>
+          <button onclick="sendViaTeams()"><i class="ti ti-brand-teams"></i> Send via Teams</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ ASSISTANT ███████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-ai">
+  <div class="card" style="margin-bottom:10px">
+    <div class="card-hd">
+      <span class="card-title"><i class="ti ti-message-dots"></i>General assistant</span>
+      <select id="ai-provider-select" onchange="setAIProvider(this.value)" style="width:auto;font-size:11px;margin:0;padding:3px 8px;border-radius:var(--r-sm)">
+        <option value="groq">⚡ Groq — LLaMA 3.3 70B (fastest)</option>
+        <option value="ollama">🦙 Ollama — Local LLM</option>
+        <option value="anthropic">🧠 Claude — Sonnet 4.6</option>
+      </select>
+      <button class="sm" onclick="clearChat()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button>
+    </div>
+    <div class="chat-wrap">
+      <div class="chat-msgs" id="chat-messages">
+        <div class="chat-msg ai"><div class="msg-lbl">Assistant</div>Hi! How can I help you today?</div>
+      </div>
+      <div class="chat-inp" style="position:relative">
+        <div style="position:relative;flex:1">
+          <input id="chat-input" placeholder="Ask anything… (suggestions appear as you type)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){sendChatMessage()}else if(event.key==='Escape'){document.getElementById('chat-suggestions').style.display='none'}" oninput="chatAutocomplete(this.value)">
+          <div id="chat-suggestions" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;overflow:hidden"></div>
+        </div>
+        <button class="primary" onclick="sendChatMessage()" aria-label="Send"><i class="ti ti-send"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ GMAIL ███████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-gm">
+  <!-- Header bar -->
+  <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;background:linear-gradient(135deg,#EA4335 0%,#FBBC05 50%,#34A853 100%);border-radius:var(--r);margin-bottom:14px">
+    <div style="width:44px;height:44px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);flex-shrink:0">
+      <i class="ti ti-brand-gmail" style="font-size:26px;color:#EA4335"></i>
+    </div>
+    <div>
+      <div style="font-size:17px;font-weight:700;color:#fff">Gmail</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.85)">Google Mail — sign in to read &amp; send emails</div>
+    </div>
+  </div>
+  <!-- Dynamic content rendered by gmail.js -->
+  <div id="gm-dynamic-body">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <i class="ti ti-loader-2" style="font-size:24px;animation:spin 1s linear infinite"></i>
+      <div style="margin-top:8px;font-size:13px">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ WHATSAPP ████████████████████████████████████████████████████████████ -->
+<div class="panel" id="p-wa">
+  <!-- Header bar -->
+  <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;background:linear-gradient(135deg,#128C7E 0%,#25D366 100%);border-radius:var(--r);margin-bottom:14px">
+    <div style="width:44px;height:44px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);flex-shrink:0">
+      <i class="ti ti-brand-whatsapp" style="font-size:26px;color:#25D366"></i>
+    </div>
+    <div>
+      <div style="font-size:17px;font-weight:700;color:#fff">WhatsApp</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.85)">Connect via QR code to view your chats</div>
+    </div>
+  </div>
+  <!-- Dynamic content rendered by whatsapp.js -->
+  <div id="wa-dynamic-body">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <i class="ti ti-loader-2" style="font-size:24px;animation:spin 1s linear infinite"></i>
+      <div style="margin-top:8px;font-size:13px">Loading…</div>
+    </div>
+  </div>
+</div>
+
+  </div><!-- /content -->
+  <div class="toast" id="toast"></div>
+</div><!-- /main -->
+
+</div><!-- /app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
