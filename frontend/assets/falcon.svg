@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 185">
+  <rect width="200" height="185" fill="#0a0a0a"/>
+
+  <!-- ═══ FEATHER 1 — longest, topmost, sweeps upper-left ═══ -->
+  <path fill="white" d="
+    M 10 7
+    C 32 30, 62 60, 100 106
+    L 106 99
+    C 66 55, 36 26, 14 5
+    Z"/>
+
+  <!-- ═══ FEATHER 2 ═══ -->
+  <path fill="white" d="
+    M 24 4
+    C 46 36, 74 65, 106 103
+    L 112 96
+    C 78 62, 50 32, 28 2
+    Z"/>
+
+  <!-- ═══ FEATHER 3 ═══ -->
+  <path fill="white" d="
+    M 38 8
+    C 60 42, 84 70, 112 98
+    L 116 92
+    C 88 66, 64 38, 42 6
+    Z"/>
+
+  <!-- ═══ FEATHER 4 ═══ -->
+  <path fill="white" d="
+    M 54 20
+    C 74 50, 96 75, 116 95
+    L 120 89
+    C 99 71, 78 46, 58 18
+    Z"/>
+
+  <!-- ═══ FEATHER 5 — closest to body, shortest ═══ -->
+  <path fill="white" d="
+    M 70 36
+    C 88 59, 104 78, 120 92
+    L 124 86
+    C 108 73, 92 54, 74 33
+    Z"/>
+
+  <!-- ═══ WING ROOT — fills the gap at the base ═══ -->
+  <path fill="white" d="
+    M 98 107
+    C 100 102, 106 96, 114 90
+    C 118 87, 122 85, 126 84
+    C 122 88, 117 92, 112 96
+    C 108 99, 104 103, 100 108
+    Z"/>
+
+  <!-- ═══ BODY / TORSO ═══ -->
+  <path fill="white" d="
+    M 100 120
+    C 97 134, 96 148, 97 160
+    C 98 168, 100 174, 102 177
+    C 104 174, 106 168, 107 160
+    C 108 148, 107 134, 104 120
+    C 102 124, 101 126, 100 126
+    C 99 126, 100 123, 100 120
+    Z"/>
+
+  <!-- ═══ CHEST / BREAST (forward-facing mass) ═══ -->
+  <path fill="white" d="
+    M 97 118
+    C 94 110, 94 100, 97 93
+    C 100 86, 107 84, 114 87
+    C 121 90, 123 99, 121 108
+    C 119 117, 113 122, 106 122
+    C 101 122, 97 120, 97 118
+    Z"/>
+
+  <!-- ═══ NECK (bridge between chest and head) ═══ -->
+  <path fill="white" d="
+    M 104 91
+    C 104 87, 107 84, 112 84
+    C 117 84, 120 87, 120 92
+    C 120 94, 119 96, 117 97
+    C 114 98, 110 97, 107 95
+    Z"/>
+
+  <!-- ═══ HEAD ═══ -->
+  <path fill="white" d="
+    M 106 88
+    C 106 79, 112 73, 120 73
+    C 128 73, 134 79, 134 88
+    C 134 97, 128 103, 120 103
+    C 112 103, 106 97, 106 88
+    Z"/>
+
+  <!-- ═══ BEAK — hooked, pointing right ═══ -->
+  <path fill="#0a0a0a" d="
+    M 132 78
+    C 143 76, 150 84, 143 92
+    C 140 96, 135 93, 134 88
+    L 140 87
+    C 144 86, 144 82, 140 82
+    Z"/>
+
+  <!-- ═══ EYE ═══ -->
+  <circle fill="#0a0a0a" cx="122" cy="84" r="5"/>
+  <circle fill="white" cx="121" cy="83" r="1.8"/>
+
+  <!-- ═══ SECONDARY WING / TAIL FEATHERS (right side) ═══ -->
+  <path fill="white" d="
+    M 118 112
+    C 130 106, 145 100, 161 95
+    C 170 92, 178 90, 183 89
+    C 175 93, 165 97, 153 101
+    C 163 97, 173 92, 180 90
+    C 171 94, 160 99, 147 103
+    C 156 99, 166 94, 174 91
+    C 164 95, 153 100, 140 104
+    Z"/>
+
+  <!-- ═══ WING SHADOW GROOVE (separates wing from body) ═══ -->
+  <path fill="#0a0a0a" d="
+    M 118 115
+    C 114 120, 110 122, 106 122
+    C 108 119, 112 116, 116 113
+    Z"/>
+</svg>

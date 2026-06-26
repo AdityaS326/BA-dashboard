@@ -6,10 +6,18 @@
 <meta name="theme-color" content="#f8f9fb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>Falcon App</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='85'>🦅</text></svg>">
+<title>Falcon App — BA Productivity Hub</title>
+<link rel="icon" type="image/svg+xml" href="assets/falcon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  /* Apply saved theme immediately to prevent flash */
+  (function(){
+    var t = localStorage.getItem('theme') ||
+      (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="src/styles/main.css">
 </head>
@@ -20,35 +28,47 @@
 <!-- SIDEBAR -->
 <nav id="sidebar">
   <div class="sb-brand">
-    <div class="sb-logo" style="font-size:17px;line-height:1">🦅</div>
+    <div class="sb-logo">
+      <img src="assets/falcon.svg" width="34" height="34" alt="Falcon" draggable="false">
+    </div>
     <div class="sb-name-wrap">
       <div class="sb-title">Falcon App</div>
-      <div id="sb-project-name" style="display:none;font-size:10px;font-weight:600;color:var(--blue);margin-top:2px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em"></div>
+      <div id="sb-project-name" style="display:none;font-size:10px;font-weight:600;color:var(--blue);margin-top:2px;max-width:115px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em"></div>
     </div>
   </div>
-  <div class="sb-section">
-    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Overview</span></div>
-    <div class="nav-item" data-panel="ov" onclick="nav(this)"><i class="ti ti-home"></i><span class="nav-lbl">Dashboard</span></div>
-    <div class="nav-item" data-panel="cal" onclick="nav(this)"><i class="ti ti-calendar"></i><span class="nav-lbl">Calendar</span><span class="nav-badge" id="cal-badge">3</span></div>
+  <div class="sb-nav">
+    <div class="sb-section">
+      <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Overview</span></div>
+      <div class="nav-item" data-panel="ov" onclick="nav(this)"><i class="ti ti-home"></i><span class="nav-lbl">Dashboard</span></div>
+      <div class="nav-item" data-panel="cal" onclick="nav(this)"><i class="ti ti-calendar"></i><span class="nav-lbl">Calendar</span><span class="nav-badge" id="cal-badge">3</span></div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Integrations</span></div>
+      <div class="nav-item" data-panel="tc" onclick="nav(this)"><i class="ti ti-brand-teams"></i><span class="nav-lbl">Teams Chat</span></div>
+      <div class="nav-item" data-panel="ol" onclick="nav(this)"><i class="ti ti-mail"></i><span class="nav-lbl">Outlook inbox</span><span class="nav-badge" id="ol-badge" style="display:none">0</span></div>
+      <div class="nav-item" data-panel="gm" onclick="nav(this)"><i class="ti ti-brand-gmail" style="color:#EA4335"></i><span class="nav-lbl">Gmail</span></div>
+      <div class="nav-item" data-panel="wa" onclick="nav(this)"><i class="ti ti-brand-whatsapp" style="color:#25D366"></i><span class="nav-lbl">WhatsApp</span></div>
+      <div class="nav-item" data-panel="wr" onclick="nav(this)"><i class="ti ti-report"></i><span class="nav-lbl">Weekly report</span></div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Tools</span></div>
+      <div class="nav-item" data-panel="mm" onclick="nav(this)"><i class="ti ti-notes"></i><span class="nav-lbl">MOM generator</span></div>
+      <div class="nav-item" data-panel="su" onclick="nav(this)"><i class="ti ti-sun"></i><span class="nav-lbl">Stand-up</span></div>
+      <div class="nav-item" data-panel="dc" onclick="nav(this)"><i class="ti ti-folder"></i><span class="nav-lbl">Documents</span></div>
+      <div class="nav-item" data-panel="lv" onclick="nav(this)"><i class="ti ti-beach"></i><span class="nav-lbl">Leave & resources</span></div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">General</span></div>
+      <div class="nav-item" data-panel="ai" onclick="nav(this)"><i class="ti ti-robot"></i><span class="nav-lbl">Assistant</span></div>
+    </div>
   </div>
-  <div class="sb-section">
-    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Integrations</span></div>
-    <div class="nav-item" data-panel="tc" onclick="nav(this)"><i class="ti ti-brand-teams"></i><span class="nav-lbl">Teams Chat</span></div>
-    <div class="nav-item" data-panel="ol" onclick="nav(this)"><i class="ti ti-mail"></i><span class="nav-lbl">Outlook inbox</span><span class="nav-badge" id="ol-badge" style="display:none">0</span></div>
-    <div class="nav-item" data-panel="gm" onclick="nav(this)"><i class="ti ti-brand-gmail" style="color:#EA4335"></i><span class="nav-lbl">Gmail</span></div>
-    <div class="nav-item" data-panel="wa" onclick="nav(this)"><i class="ti ti-brand-whatsapp" style="color:#25D366"></i><span class="nav-lbl">WhatsApp</span></div>
-    <div class="nav-item" data-panel="wr" onclick="nav(this)"><i class="ti ti-report"></i><span class="nav-lbl">Weekly report</span></div>
-  </div>
-  <div class="sb-section">
-    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">Tools</span></div>
-    <div class="nav-item" data-panel="mm" onclick="nav(this)"><i class="ti ti-notes"></i><span class="nav-lbl">MOM generator</span></div>
-    <div class="nav-item" data-panel="su" onclick="nav(this)"><i class="ti ti-sun"></i><span class="nav-lbl">Stand-up</span></div>
-    <div class="nav-item" data-panel="dc" onclick="nav(this)"><i class="ti ti-folder"></i><span class="nav-lbl">Documents</span></div>
-    <div class="nav-item" data-panel="lv" onclick="nav(this)"><i class="ti ti-beach"></i><span class="nav-lbl">Leave & resources</span></div>
-  </div>
-  <div class="sb-section">
-    <div class="sb-sec-lbl"><span class="sb-sec-lbl-txt">General</span></div>
-    <div class="nav-item" data-panel="ai" onclick="nav(this)"><i class="ti ti-robot"></i><span class="nav-lbl">Assistant</span></div>
+  <div class="sb-upgrade">
+    <div class="sb-upgrade-icon"><i class="ti ti-rocket"></i></div>
+    <div class="sb-upgrade-title">Connect Exchange</div>
+    <div class="sb-upgrade-sub">Unlock meetings, calendar &amp; email features</div>
+    <button class="sb-upgrade-btn" onclick="nav(document.querySelector('[data-panel=tc]'))">
+      <i class="ti ti-plug" style="font-size:13px"></i> Connect now
+    </button>
   </div>
   <div class="sb-foot">
     <div><div class="sb-foot-clock" id="clk">--:--:--</div><div class="sb-foot-txt" id="dt-lbl"></div></div>
@@ -57,23 +77,32 @@
 
 <!-- MAIN -->
 <div id="main">
-  <div id="topbar" style="position:relative">
+  <div id="topbar">
     <div class="tb-left">
-      <span class="tb-page" id="page-title">Teams meetings</span>
+      <span class="tb-page" id="page-title">Dashboard</span>
     </div>
-    <div id="tb-welcome" style="position:absolute;left:50%;transform:translateX(-50%);top:50%;margin-top:-10px;font-size:15px;font-weight:600;color:var(--text);display:none;white-space:nowrap;pointer-events:none"></div>
+    <div class="tb-search-wrap">
+      <i class="ti ti-search"></i>
+      <input class="tb-search-input" id="tb-search" placeholder="Search anything..." autocomplete="off">
+      <span class="tb-kbd">⌘ K</span>
+    </div>
     <div class="tb-right">
       <span class="tb-pill" id="reminder-pill" style="display:none" onclick="nav(document.querySelector('[data-panel=cal]'))">
         <i class="ti ti-bell" style="font-size:11px"></i> <span id="reminder-txt"></span>
       </span>
-      <span class="tb-pill live"><i class="ti ti-circle-check" style="font-size:11px"></i> Live</span>
-      <span class="tb-pill" id="topbar-time">--:--</span>
-      <span class="tb-pill" id="topbar-week"></span>
-      <button onclick="ewsDisconnect()" title="Logout"
-        style="display:flex;align-items:center;gap:5px;padding:5px 11px;font-size:12px;font-weight:500;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;transition:all .15s"
-        onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'"
-        onmouseout="this.style.background='transparent';this.style.color='var(--muted)'">
-        <i class="ti ti-logout" style="font-size:13px"></i> Logout
+      <span class="tb-pill live" id="tb-live-pill"><i class="ti ti-circle-check" style="font-size:11px"></i> Live</span>
+      <span class="tb-pill" id="topbar-time" style="display:none">--:--</span>
+      <span class="tb-pill" id="topbar-week" style="display:none"></span>
+      <div class="tb-divider"></div>
+      <div class="tb-icon-btn" id="theme-toggle-btn" title="Toggle theme" onclick="toggleTheme()"><i class="ti ti-sun" id="theme-icon"></i></div>
+      <div class="tb-icon-btn" title="Notifications" onclick="nav(document.querySelector('[data-panel=cal]'))">
+        <i class="ti ti-bell"></i>
+        <span class="tb-badge"></span>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-avatar" id="tb-avatar" title="Account">A</div>
+      <button onclick="ewsDisconnect()" title="Logout" class="btn-logout">
+        <i class="ti ti-logout" style="font-size:13px"></i>
       </button>
     </div>
   </div>
@@ -83,106 +112,143 @@
 <!-- ██ TEAMS MEETINGS — WELCOME / ONBOARDING ██████████████████████████████ -->
 <div class="panel active" id="p-tm">
 
-  <!-- AI background canvas -->
-  <canvas id="tm-bg-canvas"></canvas>
-
-  <!-- Large background falcon silhouette — blue-on-blue tonal -->
-  <div id="tm-falcon-bg" style="position:fixed;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden">
-    <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg"
-         style="width:92vw;max-width:1100px;opacity:0.18">
-      <!-- Body -->
-      <path d="M500 240 Q493 275 490 320 Q492 365 500 410 Q508 365 510 320 Q507 275 500 240Z" fill="#2563eb"/>
-      <!-- Head -->
-      <ellipse cx="500" cy="220" rx="22" ry="28" fill="#2563eb"/>
-      <!-- Hooked beak -->
-      <path d="M514 208 Q540 220 522 234 Q516 222 514 208Z" fill="#2563eb"/>
-      <!-- Left wing upper -->
-      <path d="M492 295 Q455 265 385 252 Q305 238 210 252 Q130 264 55 278
-               Q105 292 175 293 Q255 294 335 282 Q405 272 452 278
-               Q466 290 468 308 Q456 334 432 355 Q400 376 362 390 Q330 400 298 404
-               Q342 402 385 390 Q428 376 460 354 Q480 338 490 316 Z" fill="#2563eb"/>
-      <!-- Left wing lower -->
-      <path d="M452 278 Q420 310 395 340 Q370 368 352 392
-               Q380 378 410 358 Q440 336 458 308 Z" fill="#1d4ed8" opacity="0.7"/>
-      <!-- Right wing upper -->
-      <path d="M508 295 Q545 265 615 252 Q695 238 790 252 Q870 264 945 278
-               Q895 292 825 293 Q745 294 665 282 Q595 272 548 278
-               Q534 290 532 308 Q544 334 568 355 Q600 376 638 390 Q670 400 702 404
-               Q658 402 615 390 Q572 376 540 354 Q520 338 510 316 Z" fill="#2563eb"/>
-      <!-- Right wing lower -->
-      <path d="M548 278 Q580 310 605 340 Q630 368 648 392
-               Q620 378 590 358 Q560 336 542 308 Z" fill="#1d4ed8" opacity="0.7"/>
-      <!-- Tail feathers -->
-      <path d="M493 408 Q484 448 474 490 Q482 484 488 490 Q491 468 494 450
-               Q497 468 500 490 Q503 468 506 450 Q509 468 512 490 Q518 484 526 490
-               Q516 448 507 408 Z" fill="#2563eb"/>
-    </svg>
-  </div>
-
   <!-- ── SETUP FORM (not connected) ────────────────────────────── -->
   <div id="ews-setup-form">
+    <div class="lp-split">
 
-    <!-- Welcome header — no icon, just text -->
-    <div id="tm-welcome-wrap" style="text-align:center;margin-bottom:30px">
-      <h2 style="font-size:36px;font-weight:800;margin:0 0 12px;letter-spacing:-.5px">Welcome to Falcon App</h2>
-      <p style="font-size:15px;margin:0;line-height:1.7">Connect your Exchange account to unlock meetings calendar and email features</p>
-    </div>
-
-    <div class="card">
-        <div class="card-hd" style="margin-bottom:16px">
-          <span class="card-title"><i class="ti ti-server"></i>Connect to Exchange</span>
-          <span id="ews-notconn-badge" class="badge" style="background:var(--surface2);color:var(--muted);font-size:10px">Not connected</span>
-        </div>
-
-        <!-- Steps -->
-        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">
-          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
-            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</span>
-            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Enter your Exchange username / email</strong> — your corporate AD account (e.g. you@yourcompany.com)</div>
+      <!-- ── LEFT: Brand panel ── -->
+      <div class="lp-left">
+        <div class="lp-left-logo">
+          <div class="lp-left-logo-icon">
+            <img src="assets/falcon.svg" width="40" height="40" alt="Falcon" draggable="false" style="border-radius:8px;">
           </div>
-          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
-            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</span>
-            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Auto-detect server URL</strong> — click <em>Auto-detect</em> or enter the EWS URL manually</div>
-          </div>
-          <div class="step-box" style="display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-sm)">
-            <span style="width:22px;height:22px;background:rgba(99,179,237,.25);color:#93c5fd;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</span>
-            <div class="step-text" style="font-size:12.5px;line-height:1.65"><strong>Click Connect &amp; Sync</strong> — the app syncs your meetings, calendar and emails</div>
+          <div>
+            <div class="lp-left-logo-name">Falcon App</div>
+            <div class="lp-left-logo-org">ESDS Software Solution</div>
           </div>
         </div>
 
-        <!-- Credentials form -->
-        <label>Username / Email</label>
-        <input id="ews-username" placeholder="you@yourcompany.com" style="margin-bottom:10px"
-          oninput="ewsCheckInputs()">
+        <div class="lp-left-headline">Your BA Productivity Hub</div>
+        <div class="lp-left-sub">Connect your Exchange account to unlock intelligent meeting summaries, calendar sync, and AI-powered productivity tools.</div>
 
-        <label>Password</label>
-        <div style="position:relative;margin-bottom:10px">
-          <input id="ews-password" type="password" placeholder="Your Active Directory password"
-            style="margin-bottom:0;padding-right:40px;width:100%;box-sizing:border-box"
-            oninput="ewsCheckInputs()"
-            onkeydown="if(event.key==='Enter' && !document.getElementById('ews-connect-btn').disabled) ewsConnect(document.getElementById('ews-connect-btn'))">
-          <button type="button" onclick="(function(){var i=document.getElementById('ews-password');var b=document.getElementById('ews-pw-eye');i.type=i.type==='password'?'text':'password';b.className='ti '+(i.type==='password'?'ti-eye':'ti-eye-off')})()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:0;line-height:1"><i id="ews-pw-eye" class="ti ti-eye"></i></button>
+        <div class="lp-features">
+          <div class="lp-feature">
+            <div class="lp-feature-icon"><i class="ti ti-calendar-event"></i></div>
+            <div>
+              <div class="lp-feature-title">Smart Meetings</div>
+              <div class="lp-feature-sub">Auto-sync & generate MOM</div>
+            </div>
+          </div>
+          <div class="lp-feature">
+            <div class="lp-feature-icon"><i class="ti ti-mail"></i></div>
+            <div>
+              <div class="lp-feature-title">Email Management</div>
+              <div class="lp-feature-sub">Outlook inbox at a glance</div>
+            </div>
+          </div>
+          <div class="lp-feature">
+            <div class="lp-feature-icon"><i class="ti ti-robot"></i></div>
+            <div>
+              <div class="lp-feature-title">AI Assistant</div>
+              <div class="lp-feature-sub">Groq, Claude &amp; Ollama powered</div>
+            </div>
+          </div>
+          <div class="lp-feature">
+            <div class="lp-feature-icon"><i class="ti ti-chart-bar"></i></div>
+            <div>
+              <div class="lp-feature-title">Analytics Dashboard</div>
+              <div class="lp-feature-sub">Track all your BA work</div>
+            </div>
+          </div>
         </div>
 
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <label style="margin:0;flex:1">Exchange server URL</label>
-          <button class="sm" onclick="ewsDiscover(this)" id="ews-discover-btn">
-            <i class="ti ti-search"></i> Auto-detect
+        <div class="lp-left-footer">© 2025 ESDS Software Solution Limited</div>
+      </div>
+
+      <!-- ── RIGHT: Form panel ── -->
+      <div class="lp-right">
+        <div class="lp-form-wrap">
+
+          <div class="lp-form-eyebrow">
+            <i class="ti ti-circle-check" style="font-size:13px"></i> Exchange Sign In
+          </div>
+          <div class="lp-form-title">Welcome back</div>
+          <div class="lp-form-sub">Sign in with your Active Directory credentials to connect Exchange and unlock all features.</div>
+
+          <!-- ── Username ── -->
+          <div class="lp-field">
+            <label>Email / Username</label>
+            <input id="ews-username" placeholder="you@yourcompany.com"
+              oninput="ewsCheckInputs()">
+          </div>
+
+          <!-- ── Password ── -->
+          <div class="lp-field">
+            <label>Password</label>
+            <div class="lp-pw-wrap">
+              <input id="ews-password" type="password" placeholder="Your Active Directory password"
+                oninput="ewsCheckInputs()"
+                onkeydown="if(event.key==='Enter' && !document.getElementById('ews-connect-btn').disabled) ewsConnect(document.getElementById('ews-connect-btn'))">
+              <button type="button" class="lp-pw-toggle"
+                onclick="(function(){var i=document.getElementById('ews-password');var b=document.getElementById('ews-pw-eye');i.type=i.type==='password'?'text':'password';b.className='ti '+(i.type==='password'?'ti-eye':'ti-eye-off')})()">
+                <i id="ews-pw-eye" class="ti ti-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Error ── -->
+          <div id="ews-error" class="lp-form-error"></div>
+
+          <!-- ── Connect button ── -->
+          <button class="lp-connect-btn" id="ews-connect-btn" onclick="ewsConnect(this)" disabled>
+            <i class="ti ti-plug" style="font-size:16px"></i> Connect &amp; Sync
           </button>
+
+          <!-- ── Exchange server (secondary) ── -->
+          <div class="lp-divider">Exchange Server Setup</div>
+
+          <div class="lp-server">
+            <div class="lp-server-hd">
+              <label>Server URL</label>
+              <button class="lp-detect-btn" onclick="ewsDiscover(this)" id="ews-discover-btn">
+                <i class="ti ti-search" style="font-size:12px"></i> Auto-detect
+              </button>
+            </div>
+            <input id="ews-url"
+              style="font-family:var(--mono);font-size:12.5px;background:var(--bg);margin-bottom:0"
+              placeholder="https://owa.yourcompany.com/EWS/Exchange.asmx">
+            <div id="ews-discover-results" style="display:none;margin-top:8px"></div>
+          </div>
+
+          <!-- ── How it works ── -->
+          <div class="lp-howto">
+            <div class="lp-howto-title">How it works</div>
+            <div class="lp-howto-steps">
+              <div class="lp-step">
+                <div class="lp-step-num">1</div>
+                <div class="lp-step-txt"><strong>Enter email &amp; password</strong> — your corporate Active Directory account</div>
+              </div>
+              <div class="lp-step">
+                <div class="lp-step-num">2</div>
+                <div class="lp-step-txt"><strong>Auto-detect server</strong> — click Auto-detect or paste the EWS URL</div>
+              </div>
+              <div class="lp-step">
+                <div class="lp-step-num">3</div>
+                <div class="lp-step-txt"><strong>Connect &amp; Sync</strong> — the app syncs meetings, calendar and emails</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lp-form-footer">
+            Secure connection via Exchange Web Services (EWS) · NTLM auth
+          </div>
         </div>
-        <input id="ews-url"
-          style="font-family:var(--mono);font-size:12px;margin-bottom:6px"
-          placeholder="https://owa.yourcompany.com/EWS/Exchange.asmx">
-        <div id="ews-discover-results" style="display:none;margin-bottom:10px"></div>
+      </div><!-- end .lp-right -->
 
-        <div id="ews-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px;padding:8px 10px;background:rgba(220,38,38,.07);border-radius:var(--r-sm)"></div>
+    </div><!-- end .lp-split -->
 
-        <button class="primary" id="ews-connect-btn" onclick="ewsConnect(this)" disabled
-          style="width:100%;justify-content:center;padding:13px;font-size:14px;font-weight:600;letter-spacing:.3px;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;box-shadow:0 4px 20px rgba(79,70,229,.45);margin-top:4px;transition:filter .15s,transform .15s,box-shadow .15s">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:7px;vertical-align:middle"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          Connect &amp; Sync
-        </button>
-    </div>
+    <!-- hidden badge (used by JS) -->
+    <span id="ews-notconn-badge" style="display:none"></span>
   </div>
 
   <!-- ── CONNECTED STATE (after successful connect) ─────────────── -->
@@ -296,12 +362,48 @@
 
   <!-- Main dashboard content — revealed after project setup -->
   <div id="ov-main-content" style="display:none">
+  <!-- Page header -->
+  <div class="ph">
+    <div class="ph-left">
+      <div class="ph-title">Dashboard</div>
+      <div class="ph-sub">Track your meetings, emails and documents at a glance.</div>
+    </div>
+    <div class="ph-actions">
+      <div class="ph-date"><i class="ti ti-calendar"></i> <span id="ph-date-range">Last 30 days</span> <i class="ti ti-chevron-down" style="font-size:11px"></i></div>
+      <button onclick="nav(document.querySelector('[data-panel=ov]'))" style="border-radius:var(--r-sm)"><i class="ti ti-layout-dashboard"></i> Add widget</button>
+      <button class="primary" onclick="nav(document.querySelector('[data-panel=tc]'))"><i class="ti ti-download"></i> Sync data</button>
+    </div>
+  </div>
   <!-- Stat cards — all populated dynamically from EWS + DOCS -->
   <div class="g4">
-    <div class="stat-card blue"><div class="stat-label"><i class="ti ti-calendar-event"></i>Meetings today</div><div class="stat-value" id="stat-today-meetings">—</div><div class="stat-sub" id="stat-today-sub">Connect Exchange</div></div>
-    <div class="stat-card green"><div class="stat-label"><i class="ti ti-calendar-week"></i>This week</div><div class="stat-value" id="stat-week-meetings">—</div><div class="stat-sub" id="stat-week-sub">Connect Exchange</div></div>
-    <div class="stat-card amber"><div class="stat-label"><i class="ti ti-file-check"></i>Documents tracked</div><div class="stat-value" id="stat-docs">0</div><div class="stat-sub" id="stat-docs-sub">Add in Documents tab</div></div>
-    <div class="stat-card red"><div class="stat-label"><i class="ti ti-mail"></i>Unread emails</div><div class="stat-value" id="stat-unread">—</div><div class="stat-sub" id="stat-unread-sub">Connect Exchange</div></div>
+    <div class="stat-card featured">
+      <div class="sc-icon"><i class="ti ti-calendar-event"></i></div>
+      <div class="stat-label">Meetings today</div>
+      <div class="stat-value" id="stat-today-meetings">—</div>
+      <div class="stat-sub">
+        <span class="trend up"><i class="ti ti-trending-up"></i><span id="stat-today-sub">Sync Exchange</span></span>
+      </div>
+    </div>
+    <div class="stat-card blue">
+      <div class="sc-icon"><i class="ti ti-calendar-week"></i></div>
+      <div class="stat-label">This week</div>
+      <div class="stat-value" id="stat-week-meetings">—</div>
+      <div class="stat-sub">
+        <span class="trend up"><i class="ti ti-trending-up"></i><span id="stat-week-sub">Sync Exchange</span></span>
+      </div>
+    </div>
+    <div class="stat-card amber">
+      <div class="sc-icon"><i class="ti ti-file-check"></i></div>
+      <div class="stat-label">Documents tracked</div>
+      <div class="stat-value" id="stat-docs">0</div>
+      <div class="stat-sub" id="stat-docs-sub">Add in Documents tab</div>
+    </div>
+    <div class="stat-card red">
+      <div class="sc-icon"><i class="ti ti-mail"></i></div>
+      <div class="stat-label">Unread emails</div>
+      <div class="stat-value" id="stat-unread">—</div>
+      <div class="stat-sub" id="stat-unread-sub">Connect Exchange</div>
+    </div>
   </div>
   <div class="g2">
     <div class="card">

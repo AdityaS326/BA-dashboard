@@ -31,10 +31,15 @@ export async function getStatus(req, res) {
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const d = await r.json();
-    if (d.error) return res.json({ connected: false, reason: d.error.message });
+    if (d.error) {
+      const reason = d.error.message || JSON.stringify(d.error);
+      console.error('[WhatsApp status]', reason);
+      return res.json({ connected: false, reason });
+    }
     _profile = { name: d.verified_name || d.display_phone_number, phone: d.display_phone_number };
     res.json({ connected: true, profile: _profile });
   } catch (err) {
+    console.error('[WhatsApp status]', err.message);
     res.json({ connected: false, reason: err.message });
   }
 }
@@ -47,6 +52,13 @@ export async function sendMessage(req, res) {
   }
   const { to, message } = req.body || {};
   if (!to || !message) return res.status(400).json({ error: '"to" and "message" are required.' });
+
+  // WA_PHONE_NUMBER_ID must be the Meta numeric ID, not the actual phone number
+  if (phoneNumberId.includes('+') || phoneNumberId.includes(' ')) {
+    return res.status(400).json({
+      error: 'WA_PHONE_NUMBER_ID is set to a phone number instead of the Meta Phone Number ID. Go to Meta Developer Portal → WhatsApp → API Setup and copy the numeric Phone Number ID (e.g. 123456789012345).',
+    });
+  }
 
   const toClean = to.replace(/\D/g, '');
   try {
@@ -64,21 +76,37 @@ export async function sendMessage(req, res) {
       }),
     });
     const d = await r.json();
-    if (d.error) return res.status(400).json({ error: d.error.message });
 
-    // Store sent message locally
+    // Log full Meta response for debugging
+    console.log('[WhatsApp send] Meta response:', JSON.stringify(d));
+
+    if (d.error) {
+      console.error('[WhatsApp send] Meta error:', d.error);
+      return res.status(400).json({ error: d.error.message, meta: d.error });
+    }
+
+    // contacts[0].wa_id presence means the number is registered on WhatsApp
+    const waId = d.contacts?.[0]?.wa_id;
+    const msgId = d.messages?.[0]?.id;
+
+    if (!msgId) {
+      return res.status(500).json({ error: 'Meta returned no message ID — message may not have been queued.', raw: d });
+    }
+
     if (!_messages[toClean]) _messages[toClean] = [];
     _messages[toClean].push({
-      id:        d.messages?.[0]?.id || Date.now().toString(),
+      id:        msgId,
       from:      'me',
-      to:        toClean,
+      to:        waId || toClean,
       body:      message,
       timestamp: Math.floor(Date.now() / 1000),
       direction: 'outbound',
+      status:    'sent',
     });
 
-    res.json({ success: true, messageId: d.messages?.[0]?.id });
+    res.json({ success: true, messageId: msgId, waId });
   } catch (err) {
+    console.error('[WhatsApp send] fetch error:', err.message);
     res.status(500).json({ error: err.message });
   }
 }
@@ -134,7 +162,6 @@ export function webhookReceive(req, res) {
           const name    = val.contacts?.find(c => c.wa_id === from)?.profile?.name || ('+' + from);
 
           if (!_messages[from]) _messages[from] = [];
-          // Avoid duplicates
           if (!_messages[from].find(m => m.id === msg.id)) {
             _messages[from].push({
               id:        msg.id,
@@ -146,6 +173,14 @@ export function webhookReceive(req, res) {
               read:      false,
             });
           }
+        }
+
+        // Delivery / read status updates
+        for (const status of val.statuses || []) {
+          const phone = status.recipient_id;
+          const msgs  = _messages[phone] || [];
+          const m     = msgs.find(x => x.id === status.id);
+          if (m) m.status = status.status; // 'sent' | 'delivered' | 'read' | 'failed'
         }
       }
     }

@@ -16,6 +16,28 @@ let healthChart = null;
 let _tokenTimer      = null;   // proactive expiry warning timer
 let _tokenRefreshing = false;  // prevent concurrent refresh calls
 
+// ── Dark / Light theme toggle ──────────────────────────────────
+window.toggleTheme = function () {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next    = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.className = next === 'dark' ? 'ti ti-moon' : 'ti ti-sun';
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.title = next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+};
+
+// Apply correct icon once DOM is ready
+document.addEventListener('DOMContentLoaded', function () {
+  const saved = localStorage.getItem('theme') ||
+    (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const icon = document.getElementById('theme-icon');
+  if (icon && saved === 'dark') icon.className = 'ti ti-moon';
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.title = saved === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+});
+
 // ── Open Microsoft Teams (desktop app → web fallback) ──────────
 window.openTeamsApp = function () {
   // Try launching desktop app via protocol link

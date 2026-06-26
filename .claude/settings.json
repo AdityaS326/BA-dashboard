@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"d:\\\\OneDrive - ESDS Software Solution Limited\\\\Desktop\\\\BA-dashboard\\\\\")",
+      "Read(//d/OneDrive - ESDS Software Solution Limited/Desktop/**)",
+      "Bash(docker --version)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\")"
+    ]
+  }
+}

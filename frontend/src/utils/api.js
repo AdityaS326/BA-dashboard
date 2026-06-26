@@ -1,7 +1,7 @@
 // frontend/src/utils/api.js
 // Central API client — all HTTP calls to the backend go through here.
 
-const BASE = window.location.hostname === "localhost"
+const BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
   ? "http://localhost:3000"                                      // Dev
   : "https://ba-dashboard-67s1.onrender.com";
 
